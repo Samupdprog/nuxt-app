@@ -1,16 +1,32 @@
+image: node:18
+
 stages:
+  - install
   - build
   - deploy
 
-build-job:
+cache:
+  paths:
+    - node_modules/
+
+install_dependencies:
+  stage: install
+  script:
+    - npm ci
+
+build_nuxt:
   stage: build
   script:
-    - echo "Compilando la app..."
-    - npm install
     - npm run build
+  artifacts:
+    paths:
+      - .output
 
-deploy-job:
+deploy_to_server:
   stage: deploy
   script:
-    - echo "Desplegando..."
-    - npm run start # o el comando que uses en producción
+    - echo "Aquí iría tu script de despliegue, como rsync o scp"
+    # Ejemplo:
+    # - rsync -avz .output/ user@your-server:/var/www/nuxt
+  only:
+    - main

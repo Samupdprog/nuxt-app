@@ -1,0 +1,31 @@
+# .gitlab-ci.yml
+image: node:18
+
+stages:
+  - build
+  - deploy
+
+cache:
+  paths:
+    - node_modules/
+
+build_nuxt:
+  stage: build
+  script:
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - .output/
+
+deploy_to_server:
+  stage: deploy
+  only:
+    - main
+  script:
+    - apt-get update -y && apt-get install -y openssh-client rsync
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan 51.44.94.84 >> ~/.ssh/known_hosts
+    - rsync -avz .output/ bitnami@51.44.94.84:/home/bitnami/nuxt-app

@@ -3,11 +3,6 @@ image: node:18
 stages:
   - install
   - build
-  - deploy
-
-cache:
-  paths:
-    - node_modules/
 
 install_dependencies:
   stage: install
@@ -18,9 +13,7 @@ build_nuxt:
   stage: build
   script:
     - npm run build
-  artifacts:
-    paths:
-      - .output
+
 
 deploy_to_server:
   stage: deploy

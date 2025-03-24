@@ -4,6 +4,10 @@ stages:
   - install
   - build
 
+cache:
+  paths:
+    - node_modules/
+
 install_dependencies:
   stage: install
   script:
@@ -13,13 +17,6 @@ build_nuxt:
   stage: build
   script:
     - npm run build
-
-
-deploy_to_server:
-  stage: deploy
-  script:
-    - echo "Aquí iría tu script de despliegue, como rsync o scp"
-    # Ejemplo:
-    # - rsync -avz .output/ user@your-server:/var/www/nuxt
-  only:
-    - main
+  artifacts:
+    paths:
+      - .output

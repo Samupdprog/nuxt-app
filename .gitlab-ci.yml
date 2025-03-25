@@ -63,7 +63,8 @@ deploy:
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
   script:
-    - scp -r .output/server $DEPLOY_USER@$DEPLOY_HOST:/var/www/nuxt-app
+    - ssh $DEPLOY_USER@$DEPLOY_HOST "mkdir -p /var/www/nuxt-app"
+    - scp -r .output/server/. $DEPLOY_USER@$DEPLOY_HOST:/var/www/nuxt-app
     - ssh $DEPLOY_USER@$DEPLOY_HOST "pm2 restart nuxt-app || pm2 start /var/www/nuxt-app/index.mjs --name nuxt-app"
   environment:
     name: production

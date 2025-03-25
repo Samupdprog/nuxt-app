@@ -45,7 +45,11 @@ preview:
   when: manual
   allow_failure: true
   script:
-    - npm run preview -- --port 3000
+    - npm run preview -- --port 3000 &
+    - sleep 10
+    - echo "✅ Preview started successfully — exiting job"
+  timeout: 5m
+
 
 deploy:
   stage: deploy

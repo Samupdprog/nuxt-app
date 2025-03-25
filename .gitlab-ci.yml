@@ -13,9 +13,7 @@ cache:
   paths:
     - node_modules/
 
-# -------------------------------
-# Etapa de Test
-# -------------------------------
+# Job de test
 test:
   stage: test
   tags:
@@ -25,9 +23,7 @@ test:
     - npm ci
     - npm test || echo "No tests configured, skipping"
 
-# -------------------------------
-# Etapa de Instalación de dependencias
-# -------------------------------
+# Job de instalación de dependencias
 install_dependencies:
   stage: install
   tags:
@@ -36,9 +32,7 @@ install_dependencies:
   script:
     - npm ci
 
-# -------------------------------
-# Etapa de Build
-# -------------------------------
+# Job de build
 build_nuxt:
   stage: build
   tags:
@@ -50,9 +44,7 @@ build_nuxt:
     paths:
       - .output
 
-# -------------------------------
-# Etapa de Preview (manual)
-# -------------------------------
+# Job de preview manual
 preview:
   stage: preview
   tags:
@@ -76,28 +68,27 @@ review_app:
   image: node:18-alpine
   script:
     - echo "Deploying Review App for branch $CI_COMMIT_REF_NAME"
-    # (Opcional) Reconstruir la aplicación si es necesario
+    # Si el build ya se hizo, puedes omitir npm run build; en caso contrario:
     - npm run build
-    # Crear el directorio para la review app en el host de review
+    # Desplegar en el servidor de review usando la variable REVIEW_HOST
     - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
-    # Copiar los archivos generados
     - scp -r .output/server/. $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME
-    # Iniciar o reiniciar la aplicación usando PM2
+    # Iniciar la aplicación con PM2 (ajusta el comando si tu app se inicia distinto)
     - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 restart review-$CI_COMMIT_REF_NAME || pm2 start ~/review-apps/$CI_COMMIT_REF_NAME/index.mjs --name review-$CI_COMMIT_REF_NAME"
   environment:
     name: review/$CI_COMMIT_REF_NAME
-    # La URL generada usa el slug de la rama; actualiza "example.com" por tu dominio real o IP de review
     url: http://$CI_COMMIT_REF_SLUG.example.com
     on_stop: stop_review_app
   only:
     - merge_requests
 
-# Job para detener la Review App (se activa manualmente al cerrar el MR)
+# Job para detener la Review App (cuando se cierre el MR)
 stop_review_app:
   stage: review
   tags:
     - docker
   image: node:18-alpine
+  when: manual
   script:
     - echo "Stopping Review App for branch $CI_COMMIT_REF_NAME"
     - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 delete review-$CI_COMMIT_REF_NAME || echo 'Review app already stopped'"
@@ -105,12 +96,11 @@ stop_review_app:
   environment:
     name: review/$CI_COMMIT_REF_NAME
     action: stop
-  when: manual
   only:
     - merge_requests
 
 # -------------------------------
-# Despliegue en Producción
+# Despliegue en producción
 # -------------------------------
 deploy:
   stage: deploy

@@ -1,6 +1,3 @@
-before_script:
-  - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/".insteadOf "http://51.44.94.84/"
-
 stages:
   - test
   - install
@@ -15,6 +12,10 @@ variables:
 cache:
   paths:
     - node_modules/
+
+# Configuración global para que se use el token de CI al clonar
+before_script:
+  - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/".insteadOf "http://51.44.94.84/"
 
 # Job de test
 test:
@@ -71,12 +72,12 @@ review_app:
   image: node:18-alpine
   script:
     - echo "Deploying Review App for branch $CI_COMMIT_REF_NAME"
-    # Si el build ya se hizo, puedes omitir npm run build; en caso contrario:
+    # (Opcional) Realizar build nuevamente si es necesario:
     - npm run build
-    # Desplegar en el servidor de review usando la variable REVIEW_HOST
+    # Desplegar la aplicación en el host de review
     - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
     - scp -r .output/server/. $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME
-    # Iniciar la aplicación con PM2 (ajusta el comando si tu app se inicia distinto)
+    # Iniciar la aplicación con PM2
     - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 restart review-$CI_COMMIT_REF_NAME || pm2 start ~/review-apps/$CI_COMMIT_REF_NAME/index.mjs --name review-$CI_COMMIT_REF_NAME"
   environment:
     name: review/$CI_COMMIT_REF_NAME

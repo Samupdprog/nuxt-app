@@ -54,6 +54,7 @@ deploy:
   only:
     - main
   before_script:
+    - apk update && apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
@@ -64,3 +65,4 @@ deploy:
   environment:
     name: production
     url: http://$DEPLOY_HOST
+

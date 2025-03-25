@@ -13,12 +13,7 @@ cache:
   paths:
     - node_modules/
 
-# Configuración global para que se use el token de CI al clonar
-before_script:
-  - git config --global url."git@51.44.94.84:".insteadOf "http://51.44.94.84/"
-
-
-# Job de test
+# --- Job de Test ---
 test:
   stage: test
   tags:
@@ -28,7 +23,7 @@ test:
     - npm ci
     - npm test || echo "No tests configured, skipping"
 
-# Job de instalación de dependencias
+# --- Job de Instalación de Dependencias ---
 install_dependencies:
   stage: install
   tags:
@@ -37,7 +32,7 @@ install_dependencies:
   script:
     - npm ci
 
-# Job de build
+# --- Job de Build ---
 build_nuxt:
   stage: build
   tags:
@@ -49,7 +44,7 @@ build_nuxt:
     paths:
       - .output
 
-# Job de preview manual
+# --- Job de Preview (manual) ---
 preview:
   stage: preview
   tags:
@@ -63,9 +58,7 @@ preview:
     - echo "✅ Preview started successfully — exiting job"
   timeout: 5m
 
-# -------------------------------
-# Review Apps para Merge Requests
-# -------------------------------
+# --- Review Apps para Merge Requests ---
 review_app:
   stage: review
   tags:
@@ -73,12 +66,9 @@ review_app:
   image: node:18-alpine
   script:
     - echo "Deploying Review App for branch $CI_COMMIT_REF_NAME"
-    # (Opcional) Realizar build nuevamente si es necesario:
     - npm run build
-    # Desplegar la aplicación en el host de review
     - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
     - scp -r .output/server/. $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME
-    # Iniciar la aplicación con PM2
     - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 restart review-$CI_COMMIT_REF_NAME || pm2 start ~/review-apps/$CI_COMMIT_REF_NAME/index.mjs --name review-$CI_COMMIT_REF_NAME"
   environment:
     name: review/$CI_COMMIT_REF_NAME
@@ -87,7 +77,6 @@ review_app:
   only:
     - merge_requests
 
-# Job para detener la Review App (cuando se cierre el MR)
 stop_review_app:
   stage: review
   tags:
@@ -104,9 +93,7 @@ stop_review_app:
   only:
     - merge_requests
 
-# -------------------------------
-# Despliegue en producción
-# -------------------------------
+# --- Despliegue en Producción ---
 deploy:
   stage: deploy
   tags:

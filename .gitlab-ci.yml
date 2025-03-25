@@ -15,7 +15,7 @@ install_dependencies:
     - docker
   script:
     - git clone http://51.44.94.84/root/nuxt-app.git .
-    - npm install
+    - npm ci
 
 build_nuxt:
   stage: build

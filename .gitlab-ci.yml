@@ -1,5 +1,5 @@
 variables:
-  GIT_STRATEGY: none   
+  GIT_STRATEGY: none
 
 stages:
   - install
@@ -14,7 +14,7 @@ install_dependencies:
   tags:
     - docker
   script:
-    - git clone http://51.44.94.84/root/nuxt-app.git .   
+    - git clone http://51.44.94.84/root/nuxt-app.git .
     - npm install
 
 build_nuxt:

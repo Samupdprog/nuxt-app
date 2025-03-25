@@ -69,3 +69,4 @@ deploy:
   environment:
     name: production
     url: http://$DEPLOY_HOST
+

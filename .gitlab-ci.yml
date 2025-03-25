@@ -15,7 +15,8 @@ cache:
 
 # Configuración global para que se use el token de CI al clonar
 before_script:
-  - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/".insteadOf "http://51.44.94.84/"
+  - git config --global url."git@51.44.94.84:".insteadOf "http://51.44.94.84/"
+
 
 # Job de test
 test:

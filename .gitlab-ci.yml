@@ -1,4 +1,5 @@
-image: node:18
+variables:
+  GIT_STRATEGY: none   
 
 stages:
   - install
@@ -10,11 +11,16 @@ cache:
 
 install_dependencies:
   stage: install
+  tags:
+    - docker
   script:
+    - git clone http://51.44.94.84/root/nuxt-app.git .   
     - npm install
 
 build_nuxt:
   stage: build
+  tags:
+    - docker
   script:
     - npm run build
   artifacts:

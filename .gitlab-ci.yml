@@ -1,10 +1,31 @@
 stages:
+  - lint
+  - test
   - install
   - build
+  - preview
+  - deploy
+
+variables:
+  NODE_ENV: production
 
 cache:
   paths:
     - node_modules/
+
+lint:
+  stage: lint
+  image: node:18-alpine
+  script:
+    - npm ci
+    - npm run lint
+
+test:
+  stage: test
+  image: node:18-alpine
+  script:
+    - npm ci
+    - npm test
 
 install_dependencies:
   stage: install
@@ -22,3 +43,30 @@ build_nuxt:
   artifacts:
     paths:
       - .output
+
+preview:
+  stage: preview
+  tags:
+    - docker
+  when: manual
+  allow_failure: true
+  script:
+    - npm run preview -- --port 3000
+
+deploy:
+  stage: deploy
+  tags:
+    - docker
+  only:
+    - main
+  before_script:
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
+  script:
+    - scp -r .output/server $DEPLOY_USER@$DEPLOY_HOST:/var/www/nuxt-app
+    - ssh $DEPLOY_USER@$DEPLOY_HOST "pm2 restart nuxt-app || pm2 start /var/www/nuxt-app/index.mjs --name nuxt-app"
+  environment:
+    name: production
+    url: http://$DEPLOY_HOST

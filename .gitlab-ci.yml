@@ -8,8 +8,8 @@ stages:
 
 variables:
   NODE_ENV: production
-  # Usa el URL que GitLab espera, incluyendo el puerto (8181)
-  GIT_CLONE_URL: "http://51.44.94.84:8181/root/nuxt-app.git"
+  # Forzar el uso de la URL de clonación correcta con el token de CI:
+  GIT_CLONE_URL: "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84:8181/root/nuxt-app.git"
 
 cache:
   paths:
@@ -70,7 +70,7 @@ review_app:
   image: node:18-alpine
   script:
     - echo "Deploying Review App for branch $CI_COMMIT_REF_NAME"
-    # (Si ya se ejecutó el build, este build es opcional)
+    # (Opcional: si ya se ejecutó el build, puedes omitir este build)
     - npm run build
     - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
     - scp -r .output/server/. $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME
@@ -82,7 +82,7 @@ review_app:
   only:
     - merge_requests
 
-# Job para detener la Review App
+# Job para detener la Review App (se activa manualmente cuando se cierra el MR)
 stop_review_app:
   stage: review
   tags:

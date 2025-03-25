@@ -68,4 +68,5 @@ deploy:
     - ssh $DEPLOY_USER@$DEPLOY_HOST "pm2 restart nuxt-app || pm2 start ~/nuxt-app/index.mjs --name nuxt-app"
   environment:
     name: production
-    url: http://$DEPLOY_HOST
+    url: http://$DEPLOY_HOST:8080
+

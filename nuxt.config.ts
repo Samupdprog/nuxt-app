@@ -13,8 +13,13 @@ export default defineNuxtConfig({
   vite: {
     define: {
       'process.env.DEBUG': false
+    },
+    resolve: {
+      alias: {
+        'devextreme/core/utils/callbacks': 'devextreme/cjs/core/utils/callbacks.js'
+      }
     }
   },
 
   compatibilityDate: '2025-03-12'
-});
+})

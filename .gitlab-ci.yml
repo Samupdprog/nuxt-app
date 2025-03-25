@@ -23,7 +23,7 @@ test:
     - npm ci
     - npm test || echo "No tests configured, skipping"
 
-# Job de instalación de dependencias
+# Job de installing dependency
 install_dependencies:
   stage: install
   tags:
@@ -32,7 +32,7 @@ install_dependencies:
   script:
     - npm ci
 
-# Job de build
+# Build job
 build_nuxt:
   stage: build
   tags:
@@ -44,7 +44,7 @@ build_nuxt:
     paths:
       - .output
 
-# Job de preview manual
+# Job de preview manual 
 preview:
   stage: preview
   tags:
@@ -59,7 +59,7 @@ preview:
   timeout: 5m
 
 # -------------------------------
-# Review Apps para Merge Requests
+# Review Apps for Merge Requests
 # -------------------------------
 review_app:
   stage: review
@@ -68,12 +68,9 @@ review_app:
   image: node:18-alpine
   script:
     - echo "Deploying Review App for branch $CI_COMMIT_REF_NAME"
-    # Construir la aplicación (puedes omitir este build si ya se realizó en build_nuxt)
     - npm run build
-    # Desplegar la aplicación en el host de review
     - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
     - scp -r .output/server/. $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME
-    # Iniciar la aplicación usando PM2 (ajusta el comando según tu forma de iniciar la app)
     - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 restart review-$CI_COMMIT_REF_NAME || pm2 start ~/review-apps/$CI_COMMIT_REF_NAME/index.mjs --name review-$CI_COMMIT_REF_NAME"
   environment:
     name: review/$CI_COMMIT_REF_NAME
@@ -82,12 +79,13 @@ review_app:
   only:
     - merge_requests
 
-# Job para detener la Review App (se activa cuando se cierra el MR)
+# Job for stop the Review App 
 stop_review_app:
   stage: review
   tags:
     - docker
   image: node:18-alpine
+  when: manual
   script:
     - echo "Stopping Review App for branch $CI_COMMIT_REF_NAME"
     - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 delete review-$CI_COMMIT_REF_NAME || echo 'Review app already stopped'"
@@ -95,12 +93,11 @@ stop_review_app:
   environment:
     name: review/$CI_COMMIT_REF_NAME
     action: stop
-  when: manual
   only:
     - merge_requests
 
 # -------------------------------
-# Despliegue en producción
+# Deploy production
 # -------------------------------
 deploy:
   stage: deploy

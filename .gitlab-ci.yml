@@ -1,6 +1,6 @@
 variables:
-  CI_REPOSITORY_URL: "git@51.44.94.84:root/nuxt-app.git"
-  NODE_ENV: production
+  CI_REPOSITORY_URL: "ssh://git@51.44.94.84:2222/root/nuxt-app.git"
+
 
 stages:
   - test

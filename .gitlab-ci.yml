@@ -1,3 +1,6 @@
+before_script:
+  - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/".insteadOf "http://51.44.94.84/"
+
 stages:
   - test
   - install

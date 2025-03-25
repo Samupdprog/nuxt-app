@@ -58,10 +58,10 @@ deploy:
     - main
   before_script:
     - apk update && apk add --no-cache openssh-client
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
+    - sudo mkdir -p ~/.ssh
+    - sudo echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa
+    - sudo chmod 600 ~/.ssh/id_rsa
+    - sudo ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
   script:
     - ssh $DEPLOY_USER@$DEPLOY_HOST "mkdir -p /var/www/nuxt-app"
     - scp -r .output/server/. $DEPLOY_USER@$DEPLOY_HOST:/var/www/nuxt-app

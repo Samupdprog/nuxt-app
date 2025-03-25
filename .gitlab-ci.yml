@@ -14,7 +14,6 @@ install_dependencies:
   tags:
     - docker
   script:
-    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/root/nuxt-app.git .
     - npm ci
 
 build_nuxt:

@@ -8,6 +8,8 @@ stages:
 
 variables:
   NODE_ENV: production
+  # Usa el URL que GitLab espera, incluyendo el puerto (8181)
+  GIT_CLONE_URL: "http://51.44.94.84:8181/root/nuxt-app.git"
 
 cache:
   paths:
@@ -23,7 +25,7 @@ test:
     - npm ci
     - npm test || echo "No tests configured, skipping"
 
-# Job de installing dependency
+# Job de instalación de dependencias
 install_dependencies:
   stage: install
   tags:
@@ -32,7 +34,7 @@ install_dependencies:
   script:
     - npm ci
 
-# Build job
+# Job de build
 build_nuxt:
   stage: build
   tags:
@@ -44,7 +46,7 @@ build_nuxt:
     paths:
       - .output
 
-# Job de preview manual 
+# Job de preview manual (útil para pruebas)
 preview:
   stage: preview
   tags:
@@ -59,7 +61,7 @@ preview:
   timeout: 5m
 
 # -------------------------------
-# Review Apps for Merge Requests
+# Review Apps para Merge Requests
 # -------------------------------
 review_app:
   stage: review
@@ -68,6 +70,7 @@ review_app:
   image: node:18-alpine
   script:
     - echo "Deploying Review App for branch $CI_COMMIT_REF_NAME"
+    # (Si ya se ejecutó el build, este build es opcional)
     - npm run build
     - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
     - scp -r .output/server/. $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME
@@ -79,7 +82,7 @@ review_app:
   only:
     - merge_requests
 
-# Job for stop the Review App 
+# Job para detener la Review App
 stop_review_app:
   stage: review
   tags:
@@ -97,7 +100,7 @@ stop_review_app:
     - merge_requests
 
 # -------------------------------
-# Deploy production
+# Despliegue en producción
 # -------------------------------
 deploy:
   stage: deploy

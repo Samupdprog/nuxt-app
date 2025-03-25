@@ -50,7 +50,6 @@ preview:
     - echo "✅ Preview started successfully — exiting job"
   timeout: 5m
 
-
 deploy:
   stage: deploy
   tags:
@@ -60,7 +59,7 @@ deploy:
   before_script:
     - apk update && apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
   script:
@@ -69,4 +68,3 @@ deploy:
   environment:
     name: production
     url: http://$DEPLOY_HOST
-

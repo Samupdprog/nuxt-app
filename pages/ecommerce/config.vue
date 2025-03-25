@@ -72,7 +72,7 @@ export default {
     // Función para obtener la configuración actual de la API desde Node-RED
     async function fetchApiConfig() {
       try {
-        const response = await fetch("http://localhost:1880/get-api-request-config");
+        const response = await fetch("http://35.180.124.4:1880/get-api-request-config");
         if (!response.ok) throw new Error("Failed to fetch API configuration");
 
         const data = await response.json();
@@ -109,7 +109,7 @@ export default {
       }
 
       try {
-        const response = await fetch("http://localhost:1880/update-api-request-config", {
+        const response = await fetch("http://35.180.124.4:1880/update-api-request-config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)

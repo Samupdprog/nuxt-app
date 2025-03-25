@@ -3,27 +3,44 @@
     <!-- Loading overlay -->
     <div v-if="isLoading" class="loading-overlay">
       <div class="loading-spinner"></div>
-      <p>Waiting for response...</p>
+      <p>Loading data...</p>
     </div>
     
     <!-- Error message -->
     <div v-if="errorMessage" class="error-message">
       <p>{{ errorMessage }}</p>
-      <button @click="errorMessage = ''">Dismiss</button>
+      <button @click="errorMessage = ''">Close</button>
     </div>
     
-    <!-- Warning confirmation dialog -->
-    <div v-if="showWarningDialog" class="warning-dialog">
-      <div class="warning-dialog-content">
-        <div class="warning-header">
-          <h3>Warning</h3>
+    <!-- Account Info Summary -->
+    <div v-if="accountInfo" class="account-info">
+      <div class="account-info-header">
+        <h2>Account Information</h2>
+      </div>
+      <div class="account-info-content">
+        <div class="info-item">
+          <span class="info-label">Account:</span>
+          <span class="info-value">{{ accountInfo.accountId }}/{{ accountInfo.bankId }}</span>
         </div>
-        <div class="warning-body">
-          <p>Today have already imported data. Are you sure you want to do it again?</p>
+        <div class="info-item">
+          <span class="info-label">IBAN:</span>
+          <span class="info-value">{{ accountInfo.iban }}</span>
         </div>
-        <div class="warning-actions">
-          <button @click="confirmLastTimestampImport" class="confirm-button">Yes, proceed</button>
-          <button @click="cancelLastTimestampImport" class="cancel-button">Cancel</button>
+        <div class="info-item">
+          <span class="info-label">Currency:</span>
+          <span class="info-value">{{ accountInfo.currency }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Period:</span>
+          <span class="info-value">{{ formatDateDisplay(accountInfo.dateStart) }} - {{ formatDateDisplay(accountInfo.dateEnd) }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Opening Balance:</span>
+          <span class="info-value">{{ accountInfo.openingBalance }} {{ accountInfo.currency }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Closing Balance:</span>
+          <span class="info-value">{{ accountInfo.closingBalance }} {{ accountInfo.currency }}</span>
         </div>
       </div>
     </div>
@@ -39,34 +56,25 @@
         </label>
       </div>
 
-      <!-- Buttons for Different Queries -->
+      <!-- Execute 1 day button -->
       <div class="query-buttons">
-        <button @click="fetchLast90Days">Execute Last 90 Days</button>
-        <button @click="handleLastTimestampClick">Execute From Last Timestamp</button>
+        <button @click="fetchOneDay">Execute 1 day</button>
       </div>
 
-      <!-- Date Range Form -->
-      <div class="date-range">
+      <!-- Custom days input -->
+      <div class="custom-days">
         <label>
-          Date From:
-          <input type="date" v-model="dateFrom" />
+          Execute
+          <input 
+            type="number" 
+            v-model="customDays" 
+            min="1" 
+            max="90" 
+            placeholder="days" 
+          />
+          days
         </label>
-        <label>
-          Date To:
-          <input type="date" v-model="dateTo" />
-        </label>
-        <button @click="fetchByRange">Execute By Date Range</button>
-      </div>
-
-      <div>
-        <button @click="fetchTransactions">Reload Now</button>
-      </div>
-
-      <div class="minutes">
-        <p>Refresh Every:</p>
-        <input type="number" v-model="refreshInterval" min="1" placeholder="minutes" />
-        <p>minutes</p>
-        <button class="button-rec" @click="startAutoRefresh">Start Auto Refresh</button>
+        <button @click="fetchCustomDays">Execute</button>
       </div>
 
       <div>
@@ -78,24 +86,50 @@
     <DxDataGrid
       :data-source="transactions"
       :show-borders="true"
-      key-expr="transactionIdF"
+      key-expr="id"
       class="transactions-table"
       :allow-column-reordering="true"
       :allow-column-resizing="true"
       :row-alternation-enabled="true"
       @row-click="onRowClick"
     >
-      <!-- Renderizamos las columnas definidas en allColumns -->
-      <DxColumn
-        v-for="(col, index) in allColumns"
-        :key="index"
-        :data-field="col.dataField"
-        :caption="col.caption"
-        :width="col.width"
-        :alignment="col.alignment"
-        :header-css-class="col.headerCssClass"
-        :cell-template="col.cellTemplate"
+      <DxColumn data-field="id" caption="ID" width="100" alignment="center" />
+      <DxColumn data-field="date" caption="Date" data-type="date" width="120" alignment="center" />
+      <DxColumn data-field="amount" caption="Amount" width="100" alignment="right" cell-template="amountTemplate" />
+      <DxColumn data-field="currency" caption="Currency" width="80" alignment="center" />
+      <DxColumn data-field="counterAccount" caption="Counter Account" width="140" alignment="center" />
+      <DxColumn data-field="counterName" caption="Counter Name" width="200" alignment="left" />
+      <DxColumn data-field="bankCode" caption="Bank Code" width="100" alignment="center" />
+      <DxColumn data-field="bankName" caption="Bank Name" width="200" alignment="left" />
+      <DxColumn data-field="variableSymbol" caption="VS" width="100" alignment="center" />
+      <DxColumn data-field="message" caption="Message" width="250" alignment="left" />
+      <DxColumn data-field="type" caption="Type" width="150" alignment="center" />
+      <DxColumn data-field="executor" caption="Executed By" width="150" alignment="left" />
+      <DxColumn data-field="comment" caption="Comment" width="250" alignment="left" />
+      
+      <!-- Status column (only visible in import mode) -->
+      <DxColumn 
+        v-if="queryType === 'import'" 
+        data-field="status" 
+        caption="Status" 
+        width="80" 
+        alignment="center"
+        cell-template="statusTemplate"
       />
+
+      <template #amountTemplate="{ data }">
+        <span :class="{'positive': parseFloat(data.value) > 0, 'negative': parseFloat(data.value) < 0}">
+          {{ data.value }} {{ data.data.currency }}
+        </span>
+      </template>
+      
+      <!-- Status indicator template -->
+      <template #statusTemplate="{ data }">
+        <div class="status-indicator-container">
+          <div :class="getStatusClass(data.value)" class="status-indicator"></div>
+          <span class="status-text">{{ getStatusText(data.value) }}</span>
+        </div>
+      </template>
 
       <DxFilterRow :visible="true" />
       <DxHeaderFilter :visible="true" />
@@ -103,20 +137,10 @@
       <DxColumnChooser :enabled="true" />
       <DxSelection mode="multiple" />
       <DxPaging :page-size="100" />
-      <DxPager :show-page-size-selector="true" :allowed-page-sizes="[5, 10, 20]" />
-
-      <!-- Plantilla para formatear precios -->
-      <template #priceTemplate="{ data }">
-        <span>{{ data.value }} CZK</span>
-      </template>
-
-      <!-- Plantilla para mostrar el estado de Pohoda como círculo (solo el círculo, sin texto) -->
-      <template #pohodaStatusTemplate="{ data }">
-        <div :style="statusStyle(data.value)" class="status-indicator"></div>
-      </template>
+      <DxPager :show-page-size-selector="true" :allowed-page-sizes="[10, 20, 50, 100]" />
     </DxDataGrid>
     
-    <!-- Modal de detalles de transacción -->
+    <!-- Transaction details modal -->
     <div v-if="showTransactionDetails" class="transaction-details-modal">
       <div class="transaction-details-content">
         <div class="transaction-details-header">
@@ -127,100 +151,87 @@
         <div class="transaction-details-body">
           <div class="transaction-summary">
             <div class="transaction-id">
-              <strong>Transaction ID:</strong> {{ selectedTransaction.transactionIdF }}
+              <strong>Transaction ID:</strong> {{ selectedTransaction.id }}
             </div>
             <div class="transaction-date">
-              <strong>Date:</strong> {{ selectedTransaction.dateF }}
+              <strong>Date:</strong> {{ selectedTransaction.date }}
             </div>
             <div class="transaction-amount">
-              <strong>Amount:</strong> {{ selectedTransaction.amountF }} {{ selectedTransaction.currencyF }}
+              <strong>Amount:</strong> 
+              <span :class="{'positive': parseFloat(selectedTransaction.amount) > 0, 'negative': parseFloat(selectedTransaction.amount) < 0}">
+                {{ selectedTransaction.amount }} {{ selectedTransaction.currency }}
+              </span>
             </div>
-            <div class="transaction-statement">
-              <strong>Statement Number:</strong> {{ selectedTransaction.statementDisplayP }}
-            </div>
-          </div>
-          
-          <div v-if="queryType === 'import'" class="transaction-status">
-            <div class="status-header">
-              <div class="status-label">Status:</div>
-              <div :style="statusStyle(selectedTransaction.pohodaStatusP)" class="status-indicator-large"></div>
-              <div class="status-text">{{ selectedTransaction.pohodaStatusP === 'success' ? 'Success' : 'Error' }}</div>
-            </div>
-            <!-- Solo mostrar logs cuando hay un error -->
-            <div v-if="selectedTransaction.pohodaStatusP === 'error'" class="status-log">
-              <div class="log-label">Log:</div>
-              <div class="log-content">{{ selectedTransaction.pohodaLogP }}</div>
+            
+            <!-- Status indicator in details (only in import mode) -->
+            <div v-if="queryType === 'import'" class="transaction-status">
+              <strong>Status:</strong>
+              <div class="status-detail">
+                <div :class="getStatusClass(selectedTransaction.status)" class="status-indicator"></div>
+                <span class="status-text">{{ getStatusText(selectedTransaction.status) }}</span>
+              </div>
+              <div v-if="selectedTransaction.statusMessage" class="status-message">
+                {{ selectedTransaction.statusMessage }}
+              </div>
             </div>
           </div>
           
           <div class="transaction-details-sections">
             <div class="details-section">
-              <h3>Fio Bank Details</h3>
+              <h3>Transaction Details</h3>
               <table class="details-table">
                 <tbody>
                   <tr>
-                    <td>Beneficiary Account:</td>
-                    <td>{{ selectedTransaction.beneficiaryAccountF }}</td>
+                    <td>Counter Account:</td>
+                    <td>{{ selectedTransaction.counterAccount || 'N/A' }}</td>
                   </tr>
                   <tr>
-                    <td>Beneficiary Name:</td>
-                    <td>{{ selectedTransaction.beneficiaryNameF }}</td>
+                    <td>Counter Name:</td>
+                    <td>{{ selectedTransaction.counterName || 'N/A' }}</td>
                   </tr>
                   <tr>
                     <td>Bank Code:</td>
-                    <td>{{ selectedTransaction.bankCodeF }}</td>
+                    <td>{{ selectedTransaction.bankCode || 'N/A' }}</td>
                   </tr>
                   <tr>
                     <td>Bank Name:</td>
-                    <td>{{ selectedTransaction.bankNameF }}</td>
-                  </tr>
-                  <tr>
-                    <td>User ID:</td>
-                    <td>{{ selectedTransaction.userIdF }}</td>
-                  </tr>
-                  <tr>
-                    <td>Recipient Message:</td>
-                    <td>{{ selectedTransaction.recipientMessageF }}</td>
-                  </tr>
-                  <tr>
-                    <td>Transaction Type:</td>
-                    <td>{{ selectedTransaction.transactionTypeF }}</td>
-                  </tr>
-                  <tr>
-                    <td>Comment:</td>
-                    <td>{{ selectedTransaction.commentF }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            
-            <div class="details-section">
-              <h3>Pohoda Details</h3>
-              <table class="details-table">
-                <tbody>
-                  <tr>
-                    <td>Movement ID:</td>
-                    <td>{{ selectedTransaction.movementIdP }}</td>
-                  </tr>
-                  <tr>
-                    <td>Associated Account:</td>
-                    <td>{{ selectedTransaction.associatedAccountP }}</td>
-                  </tr>
-                  <tr>
-                    <td>Account Holder Name:</td>
-                    <td>{{ selectedTransaction.accountHolderNameP }}</td>
-                  </tr>
-                  <tr>
-                    <td>Bank Type:</td>
-                    <td>{{ selectedTransaction.bankTypeP }}</td>
+                    <td>{{ selectedTransaction.bankName || 'N/A' }}</td>
                   </tr>
                   <tr>
                     <td>Variable Symbol:</td>
-                    <td>{{ selectedTransaction.variableSymbolP }}</td>
+                    <td>{{ selectedTransaction.variableSymbol || 'N/A' }}</td>
+                  </tr>
+                  <tr>
+                    <td>Constant Symbol:</td>
+                    <td>{{ selectedTransaction.constantSymbol || 'N/A' }}</td>
                   </tr>
                   <tr>
                     <td>Specific Symbol:</td>
-                    <td>{{ selectedTransaction.specificSymbolP }}</td>
+                    <td>{{ selectedTransaction.specificSymbol || 'N/A' }}</td>
+                  </tr>
+                  <tr>
+                    <td>User ID:</td>
+                    <td>{{ selectedTransaction.userId || 'N/A' }}</td>
+                  </tr>
+                  <tr>
+                    <td>Message:</td>
+                    <td>{{ selectedTransaction.message || 'N/A' }}</td>
+                  </tr>
+                  <tr>
+                    <td>Transaction Type:</td>
+                    <td>{{ selectedTransaction.type || 'N/A' }}</td>
+                  </tr>
+                  <tr>
+                    <td>Executed By:</td>
+                    <td>{{ selectedTransaction.executor || 'N/A' }}</td>
+                  </tr>
+                  <tr>
+                    <td>Comment:</td>
+                    <td>{{ selectedTransaction.comment || 'N/A' }}</td>
+                  </tr>
+                  <tr>
+                    <td>Payment Order ID:</td>
+                    <td>{{ selectedTransaction.paymentOrderId || 'N/A' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -260,481 +271,385 @@ export default {
   data() {
     return {
       transactions: [],
+      accountInfo: null,
       lastUpdated: "",
-      refreshInterval: 15,
-      queryType: "info", // "info" o "import"
-      dateFrom: "",
-      dateTo: "",
+      queryType: "info", // "info" or "import"
+      customDays: 7, // Default to 7 days
       isLoading: false,
       errorMessage: "",
       showTransactionDetails: false,
       selectedTransaction: null,
-      showWarningDialog: false,
-      lastTimestampDate: null
+      apiUrl: "http://localhost:1880" // Base API URL
     };
   },
-  computed: {
-    // Definimos las columnas. Si el modo es import, se añaden dos columnas extra (estado y log de Pohoda)
-    allColumns() {
-      let columns = [
-        // ----------------------
-        // Columnas Fio Bank (sufijo F)
-        // ----------------------
-        {
-          dataField: "dateF",
-          caption: "Date F",
-          width: 120,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "amountF",
-          caption: "Amount F",
-          width: 100,
-          alignment: "right",
-          headerCssClass: "fio-header",
-          cellTemplate: "priceTemplate"
-        },
-        {
-          dataField: "currencyF",
-          caption: "Currency F",
-          width: 80,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "beneficiaryAccountF",
-          caption: "Beneficiary Account F",
-          width: 140,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "beneficiaryNameF",
-          caption: "Beneficiary Name F",
-          width: 150,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "bankCodeF",
-          caption: "Bank Code F",
-          width: 80,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "bankNameF",
-          caption: "Bank Name F",
-          width: 150,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "userIdF",
-          caption: "User ID F",
-          width: 100,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "recipientMessageF",
-          caption: "Recipient Message F",
-          width: 200,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "transactionTypeF",
-          caption: "Transaction Type F",
-          width: 130,
-          headerCssClass: "fio-header"
-        },
-        {
-          dataField: "commentF",
-          caption: "Comment F",
-          width: 150,
-          headerCssClass: "fio-header"
-        },
-        
-        // ----------------------
-        // Columnas Pohoda (sufijo P)
-        // ----------------------
-        {
-          dataField: "statementDisplayP",
-          caption: "Statement Number P",
-          width: 150,
-          headerCssClass: "pohoda-header"
-        },
-      ];
-
-      // Si el modo es "import", añadimos dos columnas extra: estado (con símbolo) y log de Pohoda
-      if (this.queryType === "import") {
-        columns.push(
-          {
-            dataField: "pohodaStatusP",
-            caption: "Status",
-            width: 80,
-            headerCssClass: "pohoda-header",
-            cellTemplate: "pohodaStatusTemplate"
-          },
-
-        );
-      }
-      return columns;
-    }
-  },
   methods: {
-    // Manejador de clic en fila
+    // Row click handler
     onRowClick(e) {
       this.selectedTransaction = e.data;
       this.showTransactionDetails = true;
     },
     
-    // Verificar si una fecha es hoy
-    isToday(dateString) {
-      const today = new Date();
-      const date = new Date(dateString);
-      return date.getDate() === today.getDate() &&
-             date.getMonth() === today.getMonth() &&
-             date.getFullYear() === today.getFullYear();
-    },
-    
-    // Manejador para el botón de último timestamp
-    async handleLastTimestampClick() {
-      try {
-        // Primero verificamos si hay datos del último timestamp
-        const checkEndpoint = "http://localhost:1880/get-last-timestamp";
-        const response = await fetch(checkEndpoint);
-        
-        if (!response.ok) {
-          throw new Error(`Error checking last timestamp: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.lastTimestamp) {
-          // Convertir el timestamp a fecha
-          const lastDate = new Date(data.lastTimestamp);
-          this.lastTimestampDate = lastDate;
-          
-          // Si es de hoy y estamos en modo import, mostrar advertencia
-          if (this.isToday(lastDate) && this.queryType === "import") {
-            this.showWarningDialog = true;
-            return;
-          }
-        }
-        
-        // Si no es de hoy o estamos en modo info, proceder normalmente
-        this.fetchLastTimestamp();
-        
-      } catch (error) {
-        console.error("Error checking last timestamp:", error);
-        this.errorMessage = `Error: ${error.message}`;
-        // En caso de error, proceder con la importación normal
-        this.fetchLastTimestamp();
+    // Get status class based on status value
+    getStatusClass(status) {
+      if (!status) return 'status-unknown';
+      
+      switch(status.toLowerCase()) {
+        case 'success':
+          return 'status-success';
+        case 'warning':
+          return 'status-warning';
+        case 'error':
+          return 'status-error';
+        default:
+          return 'status-unknown';
       }
     },
     
-    // Confirmar importación a pesar de la advertencia
-    confirmLastTimestampImport() {
-      this.showWarningDialog = false;
-      this.fetchLastTimestamp();
-    },
-    
-    // Cancelar importación
-    cancelLastTimestampImport() {
-      this.showWarningDialog = false;
-    },
-    
-    async fetchTransactions() {
-      await this.fetchLast90Days();
-    },
-    
-    async fetchLast90Days() {
-      const endpoint =
-        this.queryType === "info"
-          ? "http://localhost:1880/info-fio-last-90-days"
-          : "http://localhost:1880/import-fio-last-90-days";
+    // Get status text based on status value
+    getStatusText(status) {
+      if (!status) return 'Unknown';
       
+      switch(status.toLowerCase()) {
+        case 'success':
+          return 'Success';
+        case 'warning':
+          return 'Warning';
+        case 'error':
+          return 'Error';
+        default:
+          return status;
+      }
+    },
+    
+    // Fetch one day of transactions
+    async fetchOneDay() {
       try {
         this.isLoading = true;
         this.errorMessage = "";
         
-        const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+        const endpoint = this.queryType === "info" 
+          ? `${this.apiUrl}/info-fio-days/1`
+          : `${this.apiUrl}/import-fio-days/1`;
+        
+        const response = await fetch(endpoint);
         
         if (!response.ok) {
-          throw new Error(`Error fetching transactions: ${response.status} ${response.statusText}`);
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        this.processApiResponse(data);
         
-        // Validamos que la estructura de datos sea la esperada
-        if (!data.fioImportData?.AccountStatement?.TransactionList) {
-          throw new Error("Unexpected API response format: Missing transaction data");
-        }
-        
-        this.mapTransactions(data);
-        this.updateLastUpdatedTime();
       } catch (error) {
         console.error("Error fetching transactions:", error);
         this.errorMessage = `Error: ${error.message}`;
+        
+        // For demo purposes, use sample data if API fails
+        const sampleData = this.parseTransactionData();
+        this.mapTransactions(sampleData);
       } finally {
         this.isLoading = false;
+        this.updateLastUpdatedTime();
       }
     },
     
-    async fetchLastTimestamp() {
-      const endpoint =
-        this.queryType === "info"
-          ? "http://localhost:1880/info-fio-last-timestamp"
-          : "http://localhost:1880/import-fio-last-timestamp";
+    // Fetch custom number of days
+    async fetchCustomDays() {
+      // Validate input
+      const days = parseInt(this.customDays);
+      if (isNaN(days) || days < 1 || days > 90) {
+        this.errorMessage = "Please enter a number between 1 and 90";
+        return;
+      }
       
       try {
         this.isLoading = true;
         this.errorMessage = "";
         
-        const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+        const endpoint = this.queryType === "info" 
+          ? `${this.apiUrl}/info-fio-days/${days}`
+          : `${this.apiUrl}/import-fio-days/${days}`;
+        
+        const response = await fetch(endpoint);
         
         if (!response.ok) {
-          throw new Error(`Error fetching transactions by last timestamp: ${response.status} ${response.statusText}`);
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
+        this.processApiResponse(data);
         
-        if (!data.fioImportData?.AccountStatement?.TransactionList) {
-          throw new Error("Unexpected API response format: Missing transaction data");
-        }
-        
-        this.mapTransactions(data);
-        this.updateLastUpdatedTime();
       } catch (error) {
-        console.error("Error fetching transactions by last timestamp:", error);
+        console.error("Error fetching transactions:", error);
         this.errorMessage = `Error: ${error.message}`;
+        
+        // For demo purposes, use sample data if API fails
+        const sampleData = this.parseTransactionData();
+        this.mapTransactions(sampleData);
       } finally {
         this.isLoading = false;
+        this.updateLastUpdatedTime();
       }
     },
     
-    async fetchByRange() {
-      const endpoint =
-        this.queryType === "info"
-          ? "http://localhost:1880/info-fio-range-date"
-          : "http://localhost:1880/import-fio-range-date";
-      
-      try {
-        this.isLoading = true;
-        this.errorMessage = "";
-        
-        const url = `${endpoint}?dateFrom=${this.dateFrom}&dateTo=${this.dateTo}`;
-        const response = await fetch(url, { headers: { Accept: "application/json" } });
-        
-        if (!response.ok) {
-          throw new Error(`Error fetching range data: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (!data.fioImportData?.AccountStatement?.TransactionList) {
-          throw new Error("Unexpected API response format: Missing transaction data");
-        }
-        
+    // Process API response
+    processApiResponse(data) {
+      if (data.accountStatement) {
         this.mapTransactions(data);
-        this.updateLastUpdatedTime();
-      } catch (error) {
-        console.error("Error fetching range data:", error);
-        this.errorMessage = `Error: ${error.message}`;
-      } finally {
-        this.isLoading = false;
+      } else if (data.fioImportData) {
+        this.mapTransactionsWithStatus(data);
+      } else {
+        throw new Error("Unexpected API response format");
       }
     },
-    // Devuelve solo la parte de la fecha (sin hora)
-    formatDate(rawDate) {
-      return rawDate.split("+")[0];
+    
+    // Format date (remove timezone part)
+    formatDate(dateString) {
+      if (!dateString) return '';
+      return dateString.split("+")[0];
     },
-    // Aplana la estructura anidada de cada transacción
-    flattenTransaction(tx) {
-      let flat = {};
-      for (let key in tx) {
-        if (Array.isArray(tx[key])) {
-          flat[key] = tx[key].map(item => item._).join(" | ") || "N/A";
-        } else {
-          flat[key] = tx[key];
-        }
-      }
-      return flat;
+    
+    // Format date for display
+    formatDateDisplay(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString.split('+')[0]);
+      return date.toLocaleDateString();
     },
-    // Método simplificado para extraer el estado general de la respuesta de Pohoda
-    getOverallPohodaStatus(pohodaResponse) {
-      // Verificar si existe la respuesta de Pohoda
-      if (!pohodaResponse || !pohodaResponse["rsp:responsePack"]) {
-        return { status: "error", log: "No Pohoda response data available" };
-      }
-      
-      // Verificar el estado general de la respuesta
-      const responsePack = pohodaResponse["rsp:responsePack"];
-      const overallState = responsePack["$"] && responsePack["$"].state;
-      
-      if (overallState !== "ok") {
-        return { status: "error", log: `Pohoda response error: ${overallState || "Unknown error"}` };
-      }
-      
-      return { status: "success", log: "Pohoda response OK" };
-    },
-    // Extrae los detalles de la respuesta de Pohoda para una transacción específica
-    // Ahora solo devuelve "success" o "error" (los warnings se consideran success)
-    extractPohodaDetails(pohodaResponse, transactionId) {
-      try {
-        // Verificar el estado general de la respuesta
-        const overallStatus = this.getOverallPohodaStatus(pohodaResponse);
-        if (overallStatus.status !== "success") {
-          return overallStatus;
-        }
-        
-        // Buscar el item correspondiente a esta transacción
-        const responsePack = pohodaResponse["rsp:responsePack"];
-        const responsePackItems = responsePack["rsp:responsePackItem"];
-        
-        if (!responsePackItems || !Array.isArray(responsePackItems)) {
-          return { status: "success", log: "No response items found" };
-        }
-        
-        // Buscar el item por ID
-        const matchingItem = responsePackItems.find(item => {
-          const itemId = (item["$"] && item["$"].id) || "";
-          // Extraer el número de transacción del ID (FIO-XX-YY)
-          const parts = itemId.split("-");
-          if (parts.length >= 3) {
-            const transactionNumber = parts[2].padStart(2, "0");
-            // Comparar con los últimos dígitos del ID de transacción
-            const lastDigits = transactionId.slice(-2);
-            return transactionNumber === lastDigits;
+    
+    // Sample data for testing
+    parseTransactionData() {
+      // In a real application, this would come from your API
+      return {
+        fioImportData: {
+          AccountStatement: {
+            Info: [
+              {
+                accountId: ["2101909941"],
+                bankId: ["2010"],
+                currency: ["CZK"],
+                iban: ["CZ2320100000002101909941"],
+                bic: ["FIOBCZPPXXX"],
+                openingBalance: ["3734.28"],
+                closingBalance: ["4343.63"],
+                dateStart: ["2025-03-22+01:00"],
+                dateEnd: ["2025-03-24+01:00"],
+                idFrom: ["26973776676"],
+                idTo: ["26975570925"]
+              }
+            ],
+            TransactionList: [
+              {
+                Transaction: [
+                  {
+                    column_22: [{"_": "26973776676", "$": {"name": "ID pohybu", "id": "22"}}],
+                    column_0: [{"_": "2025-03-22+01:00", "$": {"name": "Datum", "id": "0"}}],
+                    column_1: [{"_": "-151.50", "$": {"name": "Objem", "id": "1"}}],
+                    column_14: [{"_": "CZK", "$": {"name": "Měna", "id": "14"}}],
+                    column_5: [{"_": "9833", "$": {"name": "VS", "id": "5"}}],
+                    column_7: [{"_": "Nákup: BOLT.EU/O/2503210913, Tallinn, EE, dne 21.3.2025, částka  151.50 CZK", "$": {"name": "Uživatelská identifikace", "id": "7"}}],
+                    column_16: [{"_": "Nákup: BOLT.EU/O/2503210913, Tallinn, EE, dne 21.3.2025, částka  151.50 CZK", "$": {"name": "Zpráva pro příjemce", "id": "16"}}],
+                    column_8: [{"_": "Platba kartou", "$": {"name": "Typ", "id": "8"}}],
+                    column_9: [{"_": "Petrův, Ivan", "$": {"name": "Provedl", "id": "9"}}],
+                    column_25: [{"_": "Nákup: BOLT.EU/O/2503210913, Tallinn, EE, dne 21.3.2025, částka  151.50 CZK", "$": {"name": "Komentář", "id": "25"}}],
+                    column_17: [{"_": "37521058142", "$": {"name": "ID pokynu", "id": "17"}}]
+                  }
+                ]
+              }
+            ]
           }
-          return false;
-        });
-        
-        if (!matchingItem) {
-          return { status: "success", log: `No matching response for transaction ${transactionId}` };
+        },
+        pohodaResponse: {
+          "rsp:responsePack": {
+            "$": {
+              "version": "2.0",
+              "id": "FIOImport",
+              "state": "ok",
+              "programVersion": "13802.10 SQL (5.11.2024)"
+            },
+            "rsp:responsePackItem": [
+              {
+                "$": {"version": "2.0", "id": "FIO-081-001", "state": "ok"},
+                "bnk:bankResponse": [
+                  {
+                    "$": {"version": "2.0", "state": "ok"},
+                    "rdc:importDetails": [
+                      {
+                        "rdc:detail": [
+                          {
+                            "rdc:state": ["warning"],
+                            "rdc:errno": ["603"],
+                            "rdc:note": ["Hodnota prvku musela bďż˝t upravena."]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-        
-        // Verificar el estado del item
-        const itemState = (matchingItem["$"] && matchingItem["$"].state) || "";
-        if (itemState !== "ok") {
-          return { status: "error", log: `Transaction error: ${itemState}` };
-        }
-        
-        // Buscar detalles de importación
-        const bankResponse = matchingItem["bnk:bankResponse"];
-        if (!bankResponse || !bankResponse[0]) {
-          return { status: "success", log: "Transaction processed" };
-        }
-        
-        const importDetails = bankResponse[0]["rdc:importDetails"];
-        if (!importDetails || !importDetails[0] || !importDetails[0]["rdc:detail"]) {
-          return { status: "success", log: "Transaction processed successfully" };
-        }
-        
-        // Extraer detalles (warnings, errors)
-        const details = importDetails[0]["rdc:detail"];
-        
-        // Buscar errores primero
-        const errors = details.filter(d => d["rdc:state"] && d["rdc:state"][0] === "error");
-        if (errors.length > 0) {
-          const errorMessages = errors.map(e => {
-            const code = e["rdc:errno"] ? e["rdc:errno"][0] : "";
-            const note = e["rdc:note"] ? e["rdc:note"][0] : "";
-            return `${code}: ${note}`;
-          });
-          return { status: "error", log: errorMessages.join(" | ") };
-        }
-        
-        // Luego buscar warnings (pero los tratamos como success)
-        const warnings = details.filter(d => d["rdc:state"] && d["rdc:state"][0] === "warning");
-        if (warnings.length > 0) {
-          const warningMessages = warnings.map(w => {
-            const code = w["rdc:errno"] ? w["rdc:errno"][0] : "";
-            const note = w["rdc:note"] ? w["rdc:note"][0] : "";
-            return `${code}: ${note}`;
-          });
-          // Warnings se consideran success, pero mostramos el mensaje
-          return { status: "success", log: warningMessages.join(" | ") };
-        }
-        
-        // Si no hay errores ni warnings, es un éxito
-        return { status: "success", log: "Transaction processed successfully" };
-        
-      } catch (error) {
-        console.error("Error extracting Pohoda details:", error);
-        return { status: "error", log: `Error processing response: ${error.message}` };
-      }
+      };
     },
-    // Mapea los datos de la API a la estructura que usará el DataGrid
+    
+    // Map API data to DataGrid structure (for info mode)
     mapTransactions(data) {
-      const fioTxs =
-        data.fioImportData?.AccountStatement?.TransactionList?.[0]?.Transaction || [];
-      let dateCounters = {};
-
-      this.transactions = fioTxs.map(tx => {
-        const flatTx = this.flattenTransaction(tx);
-        const formattedDate = this.formatDate(flatTx.column_0 || "");
-
-        if (!dateCounters[formattedDate]) {
-          dateCounters[formattedDate] = 1;
-        } else {
-          dateCounters[formattedDate]++;
-        }
-        const movementIndex = String(dateCounters[formattedDate]).padStart(2, "0");
-        const dateForStatement = formattedDate.replace(/-/g, "");
-        const statementDisplay = `${dateForStatement}/${movementIndex}`;
-
-        // Determinamos el tipo de banco
-        const amount = parseFloat((flatTx.column_1 || "0").replace(",", "."));
-        const bankType = amount >= 0 ? "receipt" : "expense";
-
-        let pohodaStatus = "waiting for a response";
-        let pohodaLog = "";
-        
-        if (this.queryType === "import" && data.pohodaResponse) {
-          const pohodaDetails = this.extractPohodaDetails(data.pohodaResponse, flatTx.column_22);
-          pohodaStatus = pohodaDetails.status;
-          pohodaLog = pohodaDetails.log;
-        }
-
+      // Extract account info
+      if (data.accountStatement?.info) {
+        const info = data.accountStatement.info;
+        this.accountInfo = {
+          accountId: info.accountId,
+          bankId: info.bankId,
+          currency: info.currency,
+          iban: info.iban,
+          bic: info.bic,
+          openingBalance: info.openingBalance,
+          closingBalance: info.closingBalance,
+          dateStart: info.dateStart,
+          dateEnd: info.dateEnd,
+          idFrom: info.idFrom,
+          idTo: info.idTo
+        };
+      }
+      
+      // Process transactions
+      const transactions = data.accountStatement?.transactionList?.transaction || [];
+      
+      this.transactions = transactions.map(tx => {
         return {
-          // Campos Fio
-          transactionIdF: flatTx.column_22,
-          dateF: formattedDate,
-          amountF: flatTx.column_1,
-          currencyF: flatTx.column_14,
-          beneficiaryAccountF: flatTx.column_2,
-          beneficiaryNameF: flatTx.column_10,
-          bankCodeF: flatTx.column_3,
-          bankNameF: flatTx.column_12,
-          constantSymbolF: flatTx.column_4,
-          variableSymbolF: flatTx.column_5,
-          specificSymbolF: flatTx.column_6,
-          userIdF: flatTx.column_7,
-          recipientMessageF: flatTx.column_16,
-          transactionTypeF: flatTx.column_8,
-          commentF: flatTx.column_25,
-          paymentOrderIdF: flatTx.column_17,
-
-          // Campos Pohoda
-          movementIdP: flatTx.column_22,
-          dateP: formattedDate,
-          amountP: flatTx.column_1,
-          currencyP: flatTx.column_14,
-          associatedAccountP: flatTx.column_2,
-          accountHolderNameP: flatTx.column_10,
-          bankCodeP: flatTx.column_3,
-          bankNameP: flatTx.column_12,
-          variableSymbolP: flatTx.column_5,
-          specificSymbolP: flatTx.column_6,
-          userIdP: flatTx.column_7,
-          recipientMessageP: flatTx.column_16,
-          transactionTypeP: flatTx.column_8,
-          commentP: flatTx.column_25,
-          paymentOrderIdP: flatTx.column_17,
-          statementDisplayP: statementDisplay,
-          bankTypeP: bankType,
-          // Solo para el modo import
-          pohodaStatusP: this.queryType === "import" ? pohodaStatus : undefined,
-          pohodaLogP: this.queryType === "import" ? pohodaLog : undefined
+          id: tx.column22?.value,
+          date: this.formatDate(tx.column0?.value),
+          amount: tx.column1?.value,
+          currency: tx.column14?.value,
+          counterAccount: tx.column2?.value,
+          counterName: tx.column10?.value,
+          bankCode: tx.column3?.value,
+          bankName: tx.column12?.value,
+          constantSymbol: tx.column4?.value,
+          variableSymbol: tx.column5?.value,
+          specificSymbol: tx.column6?.value,
+          userId: tx.column7?.value,
+          message: tx.column16?.value,
+          type: tx.column8?.value,
+          executor: tx.column9?.value,
+          comment: tx.column25?.value,
+          paymentOrderId: tx.column17?.value,
+          bic: tx.column26?.value
         };
       });
     },
+    
+    // Map API data to DataGrid structure (for import mode with status)
+    mapTransactionsWithStatus(data) {
+      // Extract account info
+      if (data.fioImportData?.AccountStatement?.Info && data.fioImportData.AccountStatement.Info.length > 0) {
+        const info = data.fioImportData.AccountStatement.Info[0];
+        this.accountInfo = {
+          accountId: info.accountId ? info.accountId[0] : '',
+          bankId: info.bankId ? info.bankId[0] : '',
+          currency: info.currency ? info.currency[0] : '',
+          iban: info.iban ? info.iban[0] : '',
+          bic: info.bic ? info.bic[0] : '',
+          openingBalance: info.openingBalance ? info.openingBalance[0] : '',
+          closingBalance: info.closingBalance ? info.closingBalance[0] : '',
+          dateStart: info.dateStart ? info.dateStart[0] : '',
+          dateEnd: info.dateEnd ? info.dateEnd[0] : '',
+          idFrom: info.idFrom ? info.idFrom[0] : '',
+          idTo: info.idTo ? info.idTo[0] : ''
+        };
+      }
+      
+      // Process transactions
+      const transactions = data.fioImportData?.AccountStatement?.TransactionList?.[0]?.Transaction || [];
+      
+      this.transactions = transactions.map((tx, index) => {
+        // Extract transaction ID
+        const txId = tx.column_22 && tx.column_22[0] ? tx.column_22[0]._ : '';
+        
+        // Get status from Pohoda response
+        let status = 'unknown';
+        let statusMessage = '';
+        
+        if (data.pohodaResponse && data.pohodaResponse["rsp:responsePack"]) {
+          const responseItems = data.pohodaResponse["rsp:responsePack"]["rsp:responsePackItem"] || [];
+          
+          // Find matching response item (using index as a simple way to match)
+          if (responseItems[index]) {
+            const itemState = responseItems[index].$ ? responseItems[index].$.state : '';
+            
+            if (itemState === 'ok') {
+              // Check for warnings or errors in details
+              const bankResponse = responseItems[index]["bnk:bankResponse"];
+              if (bankResponse && bankResponse[0] && bankResponse[0]["rdc:importDetails"]) {
+                const details = bankResponse[0]["rdc:importDetails"][0]["rdc:detail"] || [];
+                
+                // Check for errors first
+                const hasErrors = details.some(detail => 
+                  detail["rdc:state"] && detail["rdc:state"][0] === "error"
+                );
+                
+                if (hasErrors) {
+                  status = 'error';
+                  // Get first error message
+                  const errorDetail = details.find(detail => 
+                    detail["rdc:state"] && detail["rdc:state"][0] === "error"
+                  );
+                  if (errorDetail && errorDetail["rdc:note"]) {
+                    statusMessage = errorDetail["rdc:note"][0];
+                  }
+                } 
+                // Then check for warnings
+                else if (details.some(detail => 
+                  detail["rdc:state"] && detail["rdc:state"][0] === "warning"
+                )) {
+                  status = 'warning';
+                  // Get first warning message
+                  const warningDetail = details.find(detail => 
+                    detail["rdc:state"] && detail["rdc:state"][0] === "warning"
+                  );
+                  if (warningDetail && warningDetail["rdc:note"]) {
+                    statusMessage = warningDetail["rdc:note"][0];
+                  }
+                } 
+                // If no errors or warnings, it's a success
+                else {
+                  status = 'success';
+                }
+              } else {
+                status = 'success';
+              }
+            } else {
+              status = 'error';
+              statusMessage = 'Transaction processing failed';
+            }
+          }
+        }
+        
+        return {
+          id: txId,
+          date: tx.column_0 && tx.column_0[0] ? this.formatDate(tx.column_0[0]._) : '',
+          amount: tx.column_1 && tx.column_1[0] ? tx.column_1[0]._ : '',
+          currency: tx.column_14 && tx.column_14[0] ? tx.column_14[0]._ : '',
+          counterAccount: tx.column_2 && tx.column_2[0] ? tx.column_2[0]._ : '',
+          counterName: tx.column_10 && tx.column_10[0] ? tx.column_10[0]._ : '',
+          bankCode: tx.column_3 && tx.column_3[0] ? tx.column_3[0]._ : '',
+          bankName: tx.column_12 && tx.column_12[0] ? tx.column_12[0]._ : '',
+          constantSymbol: tx.column_4 && tx.column_4[0] ? tx.column_4[0]._ : '',
+          variableSymbol: tx.column_5 && tx.column_5[0] ? tx.column_5[0]._ : '',
+          specificSymbol: tx.column_6 && tx.column_6[0] ? tx.column_6[0]._ : '',
+          userId: tx.column_7 && tx.column_7[0] ? tx.column_7[0]._ : '',
+          message: tx.column_16 && tx.column_16[0] ? tx.column_16[0]._ : '',
+          type: tx.column_8 && tx.column_8[0] ? tx.column_8[0]._ : '',
+          executor: tx.column_9 && tx.column_9[0] ? tx.column_9[0]._ : '',
+          comment: tx.column_25 && tx.column_25[0] ? tx.column_25[0]._ : '',
+          paymentOrderId: tx.column_17 && tx.column_17[0] ? tx.column_17[0]._ : '',
+          status: status,
+          statusMessage: statusMessage
+        };
+      });
+    },
+    
+    // Update last updated time
     updateLastUpdatedTime() {
       const now = new Date();
       this.lastUpdated = now.toLocaleTimeString("en-GB", {
@@ -742,102 +657,124 @@ export default {
         minute: "2-digit",
         second: "2-digit"
       });
-    },
-    // Retorna el estilo del indicador según el estado (solo verde o rojo)
-    statusStyle(status) {
-      if (status === "success") return { backgroundColor: "#2ecc71", width: "15px", height: "15px", borderRadius: "50%" };
-      if (status === "error") return { backgroundColor: "#e74c3c", width: "15px", height: "15px", borderRadius: "50%" };
-      return { backgroundColor: "#ccc", width: "15px", height: "15px", borderRadius: "50%" };
-    },
-    async startAutoRefresh() {
-      try {
-        this.isLoading = true;
-        this.errorMessage = "";
-        
-        const interval = this.refreshInterval;
-        if (interval < 1) {
-          this.errorMessage = "Interval must be at least 1 minute.";
-          return;
-        }
-        
-        const response = await fetch("http://localhost:1880/start-auto-refresh-fio", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ minutes: interval })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Error starting auto refresh: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log(data.message);
-        alert(`Auto Refresh activated every ${interval} minutes`);
-      } catch (error) {
-        console.error("Error starting Auto Refresh:", error);
-        this.errorMessage = `Error configuring Auto Refresh: ${error.message}`;
-      } finally {
-        this.isLoading = false;
-      }
     }
   },
   mounted() {
-    this.fetchLast90Days();
+    // Load initial data (1 day)
+    this.fetchOneDay();
   }
 };
 </script>
 
 <style>
-/* Estilos globales (sin scoped para que afecten a DevExtreme) */
+/* Global styles (not scoped to affect DevExtreme) */
 .transactions-container {
   width: 100%;
   min-height: 100vh;
   background: white;
   position: relative;
 }
+
 .transactions-table {
   width: 100%;
+  margin-top: 20px;
 }
+
 .controls {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-around;
   margin-bottom: 10px;
-  gap: 10px;
+  gap: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  align-items: center;
 }
+
 .query-type label {
-  margin-right: 10px;
+  margin-right: 15px;
   font-weight: bold;
 }
-.query-buttons,
-.date-range {
+
+.query-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.custom-days {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-/* Encabezados para Fio y Pohoda */
-.fio-header .dx-datagrid-text-content {
-  background-color: #3498db !important;
-  color: white !important;
-  font-weight: bold !important;
+.custom-days input {
+  width: 60px;
+  text-align: center;
+  margin: 0 5px;
+  padding: 5px;
 }
 
-.pohoda-header .dx-datagrid-text-content {
-  background-color: #27ae60 !important;
-  color: white !important;
-  font-weight: bold !important;
+button {
+  padding: 8px 12px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-/* Indicador de estado */
+button:hover {
+  background-color: #2980b9;
+}
+
+/* Status indicators */
+.status-indicator-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .status-indicator {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
   display: inline-block;
 }
 
-.status-indicator-large {
-  display: inline-block;
-  width: 20px !important;
-  height: 20px !important;
+.status-success {
+  background-color: #2ecc71; /* Green */
+}
+
+.status-warning {
+  background-color: #f39c12; /* Orange */
+}
+
+.status-error {
+  background-color: #e74c3c; /* Red */
+}
+
+.status-unknown {
+  background-color: #95a5a6; /* Gray */
+}
+
+.status-text {
+  font-size: 12px;
+}
+
+.status-detail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+}
+
+.status-message {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #7f8c8d;
+  font-style: italic;
 }
 
 /* Loading overlay */
@@ -898,71 +835,7 @@ export default {
   cursor: pointer;
 }
 
-/* Warning dialog */
-.warning-dialog {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1200;
-}
-
-.warning-dialog-content {
-  background-color: white;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
-}
-
-.warning-header {
-  background-color: #f39c12;
-  color: white;
-  padding: 15px 20px;
-}
-
-.warning-header h3 {
-  margin: 0;
-  font-size: 1.2rem;
-}
-
-.warning-body {
-  padding: 20px;
-}
-
-.warning-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding: 15px 20px;
-  background-color: #f5f5f5;
-  gap: 10px;
-}
-
-.confirm-button {
-  background-color: #f39c12;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.cancel-button {
-  background-color: #e0e0e0;
-  color: #333;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-/* Modal de detalles de transacción */
+/* Transaction details modal */
 .transaction-details-modal {
   position: fixed;
   top: 0;
@@ -980,7 +853,7 @@ export default {
   background-color: white;
   border-radius: 8px;
   width: 90%;
-  max-width: 1000px;
+  max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
@@ -1027,38 +900,10 @@ export default {
 }
 
 .transaction-status {
-  margin-bottom: 20px;
-  padding: 15px;
-  border: 1px solid #eee;
-  border-radius: 5px;
-}
-
-.status-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.status-label, .log-label {
-  font-weight: bold;
-  min-width: 60px;
-}
-
-.status-text {
-  font-weight: 500;
-}
-
-.status-log {
-  display: flex;
+  flex-wrap: wrap;
   margin-top: 10px;
-}
-
-.log-content {
-  padding: 10px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  flex: 1;
 }
 
 .transaction-details-sections {
@@ -1091,5 +936,52 @@ export default {
   font-weight: bold;
   width: 40%;
 }
-</style>
 
+/* Styles for positive and negative values */
+.positive {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.negative {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+/* Account info styles */
+.account-info {
+  margin: 15px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border-left: 4px solid #3498db;
+}
+
+.account-info-header h2 {
+  margin-top: 0;
+  color: #2c3e50;
+  font-size: 1.2rem;
+}
+
+.account-info-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.info-item {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-label {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+.info-value {
+  font-weight: bold;
+  color: #2c3e50;
+}
+</style>

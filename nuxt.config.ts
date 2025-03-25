@@ -1,25 +1,21 @@
+import { defineNuxtConfig } from "nuxt/config"
+
 export default defineNuxtConfig({
-  modules: ['@pinia/nuxt'],
-  css: [
-    'devextreme/dist/css/dx.light.css',
-    'vuetify/styles', 
-    '@mdi/font/css/materialdesignicons.css'
-  ],
-
+  modules: ["@pinia/nuxt"],
+  css: ["devextreme/dist/css/dx.light.css", "vuetify/styles", "@mdi/font/css/materialdesignicons.css"],
   build: {
-    transpile: ['vuetify', 'devextreme-vue']
+    transpile: ["vuetify", "devextreme-vue"],
   },
-
   vite: {
     define: {
-      'process.env.DEBUG': false
+      "process.env.DEBUG": false,
     },
     resolve: {
       alias: {
-        'devextreme/core/utils/callbacks': 'devextreme/cjs/core/utils/callbacks.js'
-      }
-    }
+        "devextreme/core/utils/callbacks": "devextreme/cjs/core/utils/callbacks.js",
+      },
+    },
   },
-
-  compatibilityDate: '2025-03-12'
+  compatibilityDate: "2025-03-12",
 })
+

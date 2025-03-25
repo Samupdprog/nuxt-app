@@ -120,7 +120,7 @@ export default {
       this.errorMessage = "";
 
       try {
-        const response = await fetch(`http://localhost:1880/get-order/${this.$route.params.id}`);
+        const response = await fetch(`http://35.180.124.4:1880/get-order/${this.$route.params.id}`);
         if (!response.ok) throw new Error("Order not found");
         this.order = await response.json();
       } catch (error) {

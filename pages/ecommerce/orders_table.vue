@@ -104,7 +104,7 @@ export default {
   methods: {
     async fetchOrders() {
       try {
-        const response = await fetch("http://localhost:1880/get-all-orders");
+        const response = await fetch("http://35.180.124.4:1880/get-all-orders");
         const data = await response.json();
 
         this.orders = data.processedOrders.map(order => {
@@ -156,7 +156,7 @@ export default {
           return;
         }
 
-        const response = await fetch("http://localhost:1880/start-auto-refresh", {
+        const response = await fetch("http://35.180.124.4:1880/start-auto-refresh", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ minutes: interval })

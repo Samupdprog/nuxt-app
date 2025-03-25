@@ -59,7 +59,7 @@ preview:
   timeout: 5m
 
 # -------------------------------
-# Review Apps for Merge Requests
+# Review Apps para Merge Requests
 # -------------------------------
 review_app:
   stage: review
@@ -100,7 +100,7 @@ stop_review_app:
     - merge_requests
 
 # -------------------------------
-# deploying
+# Despliegue en producción
 # -------------------------------
 deploy:
   stage: deploy
@@ -121,4 +121,4 @@ deploy:
     - ssh $DEPLOY_USER@$DEPLOY_HOST "pm2 restart nuxt-app || pm2 start ~/nuxt-app/index.mjs --name nuxt-app"
   environment:
     name: production
-    url: http://$DEPLOY_HOST
+    url: http://$DEPLOY_HOST:8080

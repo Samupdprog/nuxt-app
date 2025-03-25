@@ -1,12 +1,7 @@
-variables:
-  CI_REPOSITORY_URL: "ssh://git@51.44.94.84:2222/root/nuxt-app.git"
-
-
 stages:
   - test
   - install
   - build
-  - preview
   - review
   - deploy
 
@@ -17,30 +12,24 @@ cache:
   paths:
     - node_modules/
 
-# --- Job de Test ---
 test:
   stage: test
-  tags:
-    - docker
+  tags: [docker]
   image: node:18-alpine
   script:
     - npm ci
-    - npm test || echo "No tests configured, skipping"
+    - npm test || echo "No tests configured"
 
-# --- Job de Instalación de Dependencias ---
 install_dependencies:
   stage: install
-  tags:
-    - docker
+  tags: [docker]
   image: node:18-alpine
   script:
     - npm ci
 
-# --- Job de Build ---
 build_nuxt:
   stage: build
-  tags:
-    - docker
+  tags: [docker]
   image: node:18-alpine
   script:
     - npm run build
@@ -48,73 +37,50 @@ build_nuxt:
     paths:
       - .output
 
-# --- Job de Preview (manual) ---
-preview:
-  stage: preview
-  tags:
-    - docker
-  image: node:18-alpine
-  when: manual
-  allow_failure: true
-  script:
-    - npm run preview -- --port 3000 &
-    - sleep 10
-    - echo "✅ Preview started successfully — exiting job"
-  timeout: 5m
-
-# --- Review Apps para Merge Requests ---
 review_app:
   stage: review
-  tags:
-    - docker
+  tags: [docker]
   image: node:18-alpine
-  script:
-    - echo "Deploying Review App for branch $CI_COMMIT_REF_NAME"
-    - npm run build
-    - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
-    - scp -r .output/server/. $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME
-    - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 restart review-$CI_COMMIT_REF_NAME || pm2 start ~/review-apps/$CI_COMMIT_REF_NAME/index.mjs --name review-$CI_COMMIT_REF_NAME"
-  environment:
-    name: review/$CI_COMMIT_REF_NAME
-    url: http://$CI_COMMIT_REF_SLUG.example.com
-    on_stop: stop_review_app
-  only:
-    - merge_requests
-
-stop_review_app:
-  stage: review
-  tags:
-    - docker
-  image: node:18-alpine
-  when: manual
-  script:
-    - echo "Stopping Review App for branch $CI_COMMIT_REF_NAME"
-    - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 delete review-$CI_COMMIT_REF_NAME || echo 'Review app already stopped'"
-    - ssh $DEPLOY_USER@$REVIEW_HOST "rm -rf ~/review-apps/$CI_COMMIT_REF_NAME"
-  environment:
-    name: review/$CI_COMMIT_REF_NAME
-    action: stop
-  only:
-    - merge_requests
-
-# --- Despliegue en Producción ---
-deploy:
-  stage: deploy
-  tags:
-    - docker
-  image: node:18-alpine
-  only:
-    - main
   before_script:
-    - apk update && apk add --no-cache openssh-client
+    - apk add --no-cache openssh-client rsync
     - mkdir -p ~/.ssh
     - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
+    - ssh-keyscan $REVIEW_HOST >> ~/.ssh/known_hosts
   script:
-    - ssh $DEPLOY_USER@$DEPLOY_HOST "mkdir -p ~/nuxt-app"
-    - scp -r .output/server/. $DEPLOY_USER@$DEPLOY_HOST:~/nuxt-app
-    - ssh $DEPLOY_USER@$DEPLOY_HOST "pm2 restart nuxt-app || pm2 start ~/nuxt-app/index.mjs --name nuxt-app"
+    - npm ci
+    - npm run build
+    - rsync -avz .output/ $DEPLOY_USER@$REVIEW_HOST:/home/$DEPLOY_USER/review-apps/$CI_COMMIT_REF_NAME/
+    - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 startOrRestart /home/$DEPLOY_USER/review-apps/$CI_COMMIT_REF_NAME/index.mjs --name review-$CI_COMMIT_REF_NAME"
   environment:
-    name: production
-    url: http://$DEPLOY_HOST:8080
+    name: review/$CI_COMMIT_REF_NAME
+    url: http://$CI_COMMIT_REF_NAME.$APPS_DOMAIN
+    on_stop: stop_review_app
+  only:
+    - branches
+  except:
+    - main
+
+stop_review_app:
+  stage: review
+  tags: [docker]
+  image: node:18-alpine
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - apk add --no-cache openssh-client
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan $REVIEW_HOST >> ~/.ssh/known_hosts
+  script:
+    - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 delete review-$CI_COMMIT_REF_NAME || true"
+    - ssh $DEPLOY_USER@$REVIEW_HOST "rm -rf /home/$DEPLOY_USER/review-apps/$CI_COMMIT_REF_NAME"
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    action: stop
+  when: manual
+  only:
+    - branches
+  except:
+    - main

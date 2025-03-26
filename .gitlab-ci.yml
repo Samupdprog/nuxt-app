@@ -33,7 +33,6 @@ build:
     - npm ci
   script:
     - npm run build
-  # <— QUITAMOS artifacts para evitar error 413
 
 review_app:
   stage: review

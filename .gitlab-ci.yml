@@ -1,12 +1,14 @@
+image: bitnami/nuxt-ci-runner
+
 stages:
   - test
-  - install
   - build
   - review
   - deploy
 
 variables:
   NODE_ENV: production
+  GIT_STRATEGY: none
 
 cache:
   paths:
@@ -15,22 +17,18 @@ cache:
 test:
   stage: test
   tags: [docker]
-  image: node:18-alpine
-  script:
+  before_script:
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
     - npm ci
+  script:
     - npm test || echo "No tests configured"
 
-install_dependencies:
-  stage: install
-  tags: [docker]
-  image: node:18-alpine
-  script:
-    - npm ci
-
-build_nuxt:
+build:
   stage: build
   tags: [docker]
-  image: node:18-alpine
+  before_script:
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
+    - npm ci
   script:
     - npm run build
   artifacts:
@@ -40,47 +38,47 @@ build_nuxt:
 review_app:
   stage: review
   tags: [docker]
-  image: node:18-alpine
   before_script:
-    - apk add --no-cache openssh-client rsync
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
+    - mkdir -p ~/.ssh && echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan $REVIEW_HOST >> ~/.ssh/known_hosts
+    - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
   script:
-    - npm ci
-    - npm run build
-    - rsync -avz .output/ $DEPLOY_USER@$REVIEW_HOST:/home/$DEPLOY_USER/review-apps/$CI_COMMIT_REF_NAME/
-    - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 startOrRestart /home/$DEPLOY_USER/review-apps/$CI_COMMIT_REF_NAME/index.mjs --name review-$CI_COMMIT_REF_NAME"
+    - rsync -avz .output/ $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME/
   environment:
     name: review/$CI_COMMIT_REF_NAME
     url: http://$CI_COMMIT_REF_NAME.$APPS_DOMAIN
     on_stop: stop_review_app
-  only:
-    - branches
-  except:
-    - main
+  rules:
+    - if: '$CI_COMMIT_REF_NAME != "main"'
 
 stop_review_app:
   stage: review
   tags: [docker]
-  image: node:18-alpine
-  variables:
-    GIT_STRATEGY: none
   before_script:
-    - apk add --no-cache openssh-client
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan $REVIEW_HOST >> ~/.ssh/known_hosts
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
   script:
-    - ssh $DEPLOY_USER@$REVIEW_HOST "pm2 delete review-$CI_COMMIT_REF_NAME || true"
-    - ssh $DEPLOY_USER@$REVIEW_HOST "rm -rf /home/$DEPLOY_USER/review-apps/$CI_COMMIT_REF_NAME"
+    - ssh $DEPLOY_USER@$REVIEW_HOST "rm -rf ~/review-apps/$CI_COMMIT_REF_NAME"
   environment:
     name: review/$CI_COMMIT_REF_NAME
     action: stop
   when: manual
-  only:
-    - branches
-  except:
-    - main
+  rules:
+    - if: '$CI_COMMIT_REF_NAME != "main"'
+
+deploy:
+  stage: deploy
+  tags: [docker]
+  before_script:
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
+    - mkdir -p ~/.ssh && echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
+  script:
+    - ssh $DEPLOY_USER@$DEPLOY_HOST "rm -rf ~/nuxt-app && mkdir ~/nuxt-app"
+    - rsync -avz .output/ $DEPLOY_USER@$DEPLOY_HOST:~/nuxt-app/
+    - ssh $DEPLOY_USER@$DEPLOY_HOST "pm2 restart nuxt-app || pm2 start ~/nuxt-app/index.mjs --name nuxt-app"
+  environment:
+    name: production
+    url: http://$DEPLOY_HOST:8080
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

@@ -46,6 +46,8 @@ review_app:
     - mkdir -p ~/.ssh && echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan "$REVIEW_HOST" >> ~/.ssh/known_hosts
     - ssh "$DEPLOY_USER@$REVIEW_HOST" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
+    - git remote set-url origin "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git"
+    - git pull --tags origin $CI_COMMIT_REF_NAME
   script:
     - rsync -avz .output/ $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME/
   environment:

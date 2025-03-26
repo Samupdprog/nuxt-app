@@ -39,23 +39,28 @@ review_app:
   stage: review
   tags: [docker]
   before_script:
+    - apt-get update && apt-get install -y rsync
     - rm -rf ./*
     - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
     - npm ci
     - npm run build
-    - mkdir -p ~/.ssh && echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan "$REVIEW_HOST" >> ~/.ssh/known_hosts
     - ssh "$DEPLOY_USER@$REVIEW_HOST" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
+    - echo "DEPLOY_USER: $DEPLOY_USER, REVIEW_HOST: $REVIEW_HOST, CI_COMMIT_REF_NAME: $CI_COMMIT_REF_NAME"
     - git remote set-url origin "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git"
     - git pull --tags origin $CI_COMMIT_REF_NAME
   script:
-    - rsync -avz .output/ $DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME/
+    - rsync -avz -vv .output/ "$DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME/"
   environment:
     name: review/$CI_COMMIT_REF_NAME
     url: http://$CI_COMMIT_REF_NAME.$APPS_DOMAIN
     on_stop: stop_review_app
   rules:
     - if: '$CI_COMMIT_REF_NAME != "main"'
+
 
 stop_review_app:
   stage: review

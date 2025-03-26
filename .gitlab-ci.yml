@@ -51,7 +51,7 @@ review_app:
     - echo "DEPLOY_USER=$DEPLOY_USER"
     - echo "$SSH_PRIVATE_KEY" | base64 -d | head -n 10
     - ssh-keyscan -H "$REVIEW_HOST" || echo "SSH scan failed"
-    - ssh "$DEPLOY_USER@$REVIEW_HOST" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
+    - ssh "bitnami@51.44.94.84" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
     - echo "DEPLOY_USER=$DEPLOY_USER REVIEW_HOST=$REVIEW_HOST CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
     - git remote set-url origin "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git"
     - git pull --tags origin "$CI_COMMIT_REF_NAME"
@@ -72,7 +72,7 @@ stop_review_app:
     - rm -rf ./*
     - git clone "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git" .
   script:
-    - ssh "$DEPLOY_USER@$REVIEW_HOST" "rm -rf ~/review-apps/$CI_COMMIT_REF_NAME"
+    - ssh "bitnami@51.44.94.84" "rm -rf ~/review-apps/$CI_COMMIT_REF_NAME"
   environment:
     name: "review/$CI_COMMIT_REF_NAME"
     action: stop

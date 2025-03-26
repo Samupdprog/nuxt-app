@@ -33,9 +33,7 @@ build:
     - npm ci
   script:
     - npm run build
-  artifacts:
-    paths:
-      - .output
+  # <— QUITAMOS artifacts para evitar error 413
 
 review_app:
   stage: review
@@ -43,6 +41,8 @@ review_app:
   before_script:
     - rm -rf ./*
     - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
+    - npm ci
+    - npm run build
     - mkdir -p ~/.ssh && echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan $REVIEW_HOST >> ~/.ssh/known_hosts
     - ssh $DEPLOY_USER@$REVIEW_HOST "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
@@ -76,6 +76,8 @@ deploy:
   before_script:
     - rm -rf ./*
     - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git .
+    - npm ci
+    - npm run build
     - mkdir -p ~/.ssh && echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
   script:

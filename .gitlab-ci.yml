@@ -38,6 +38,10 @@ review_app:
   stage: review
   tags:
     - docker
+  variables:
+    REVIEW_HOST: "51.44.94.84"      
+    DEPLOY_USER: "bitnami"          
+    APPS_DOMAIN: "tudominio.com"    
   before_script:
     - apt-get update && apt-get install -y rsync
     - rm -rf ./*
@@ -50,10 +54,8 @@ review_app:
     - echo "REVIEW_HOST=$REVIEW_HOST"
     - echo "DEPLOY_USER=$DEPLOY_USER"
     - echo "$SSH_PRIVATE_KEY" | base64 -d | head -n 10
-    # Agrega la clave del host al archivo known_hosts
     - ssh-keyscan -H "$REVIEW_HOST" >> ~/.ssh/known_hosts || echo "SSH scan failed"
-    # Crea el directorio remoto en el servidor de review
-    - ssh "bitnami@51.44.94.84" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
+    - ssh "$DEPLOY_USER@$REVIEW_HOST" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
     - echo "DEPLOY_USER=$DEPLOY_USER REVIEW_HOST=$REVIEW_HOST CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
     - git remote set-url origin "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git"
     - git pull --tags origin "$CI_COMMIT_REF_NAME"
@@ -70,17 +72,21 @@ stop_review_app:
   stage: review
   tags:
     - docker
+  variables:
+    REVIEW_HOST: "51.44.94.84"
+    DEPLOY_USER: "bitnami"
   before_script:
     - rm -rf ./*
     - git clone "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git" .
   script:
-    - ssh "bitnami@51.44.94.84" "rm -rf ~/review-apps/$CI_COMMIT_REF_NAME"
+    - ssh "$DEPLOY_USER@$REVIEW_HOST" "rm -rf ~/review-apps/$CI_COMMIT_REF_NAME"
   environment:
     name: "review/$CI_COMMIT_REF_NAME"
     action: stop
   when: manual
   rules:
     - if: '$CI_COMMIT_REF_NAME != "main"'
+
 
 deploy:
   stage: deploy

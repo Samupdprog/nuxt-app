@@ -36,30 +36,21 @@ build:
 
 review_app:
   stage: review
-  tags:
-    - docker
+  tags: [docker]
   variables:
     REVIEW_HOST: "51.44.94.84"
     DEPLOY_USER: "bitnami"
     APPS_DOMAIN: "tudominio.com"
   before_script:
-    - apt-get update && apt-get install -y rsync
-    - rm -rf ./*
-    - git clone "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git" .
-    - npm ci
-    - npm run build
-    - mkdir -p ~/.ssh
-    # Reemplazamos secuencias literales \n por saltos reales y eliminamos CR antes de decodificar
-    - echo "$SSH_PRIVATE_KEY" | sed 's/\\n/\n/g' | tr -d '\r' | base64 -d > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - echo "REVIEW_HOST=$REVIEW_HOST"
-    - echo "DEPLOY_USER=$DEPLOY_USER"
-    - echo "$SSH_PRIVATE_KEY" | base64 -d | head -n 10
-    - ssh-keyscan -H "$REVIEW_HOST" >> ~/.ssh/known_hosts || echo "SSH scan failed"
-    - ssh "$DEPLOY_USER@$REVIEW_HOST" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"
-    - echo "DEPLOY_USER=$DEPLOY_USER REVIEW_HOST=$REVIEW_HOST CI_COMMIT_REF_NAME=$CI_COMMIT_REF_NAME"
-    - git remote set-url origin "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git"
-    - git pull --tags origin "$CI_COMMIT_REF_NAME"
+  - apt-get update && apt-get install -y rsync
+  - rm -rf ./*
+  - git clone "http://gitlab-ci-token:${CI_JOB_TOKEN}@51.44.94.84/gitlab/root/nuxt-app.git" .
+  - npm ci
+  - npm run build
+  - mkdir -p ~/.ssh
+  - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
+  - ssh-keyscan -H "$REVIEW_HOST" >> ~/.ssh/known_hosts
   script:
     - rsync -avz -vv .output/ "$DEPLOY_USER@$REVIEW_HOST:~/review-apps/$CI_COMMIT_REF_NAME/"
   environment:
@@ -71,8 +62,7 @@ review_app:
 
 stop_review_app:
   stage: review
-  tags:
-    - docker
+  tags: [docker]
   variables:
     REVIEW_HOST: "51.44.94.84"
     DEPLOY_USER: "bitnami"

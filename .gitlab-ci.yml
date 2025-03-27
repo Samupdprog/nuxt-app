@@ -49,7 +49,7 @@ review_app:
     - npm ci
     - npm run build
     - mkdir -p ~/.ssh
-    - if [ -f "$SSH_PRIVATE_KEY_FILE" ]; then cp "$SSH_PRIVATE_KEY_FILE" ~/.ssh/id_rsa; else echo "SSH_PRIVATE_KEY_FILE no está definido"; fi
+    - if [ -f "$SSH_PRIVATE_KEY_FILE" ]; then cp "$SSH_PRIVATE_KEY_FILE" ~/.ssh/id_rsa; else echo "SSH_PRIVATE_KEY_FILE no está definido"; exit 1; fi
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H "$REVIEW_HOST" >> ~/.ssh/known_hosts || echo "SSH scan failed"
     - ssh "$DEPLOY_USER@$REVIEW_HOST" "mkdir -p ~/review-apps/$CI_COMMIT_REF_NAME"

@@ -39,9 +39,9 @@ review_app:
   tags:
     - docker
   variables:
-    REVIEW_HOST: "51.44.94.84"      
-    DEPLOY_USER: "bitnami"          
-    APPS_DOMAIN: "tudominio.com"    
+    REVIEW_HOST: "51.44.94.84"
+    DEPLOY_USER: "bitnami"
+    APPS_DOMAIN: "tudominio.com"
   before_script:
     - apt-get update && apt-get install -y rsync
     - rm -rf ./*
@@ -49,7 +49,8 @@ review_app:
     - npm ci
     - npm run build
     - mkdir -p ~/.ssh
-    - printf "%b" "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
+    # Reemplazamos secuencias literales \n por saltos reales y eliminamos CR antes de decodificar
+    - echo "$SSH_PRIVATE_KEY" | sed 's/\\n/\n/g' | tr -d '\r' | base64 -d > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - echo "REVIEW_HOST=$REVIEW_HOST"
     - echo "DEPLOY_USER=$DEPLOY_USER"

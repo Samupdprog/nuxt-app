@@ -1,246 +1,304 @@
 <template>
-  <div class="transactions-container">
-    <!-- Loading overlay -->
-    <div v-if="isLoading" class="loading-overlay">
-      <div class="loading-spinner"></div>
-      <p>Loading data...</p>
-    </div>
-    
-    <!-- Error message -->
-    <div v-if="errorMessage" class="error-message">
-      <p>{{ errorMessage }}</p>
-      <button @click="errorMessage = ''">Close</button>
-    </div>
-    
-    <!-- Account Info Summary -->
-    <div v-if="accountInfo" class="account-info">
-      <div class="account-info-header">
-        <h2>Account Information</h2>
+  <AppLayout>
+    <div class="fio-dashboard">
+      <!-- Loading overlay -->
+      <div v-if="isLoading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Loading transactions...</p>
       </div>
-      <div class="account-info-content">
-        <div class="info-item">
-          <span class="info-label">Account:</span>
-          <span class="info-value">{{ accountInfo.accountId }}/{{ accountInfo.bankId }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">IBAN:</span>
-          <span class="info-value">{{ accountInfo.iban }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Currency:</span>
-          <span class="info-value">{{ accountInfo.currency }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Period:</span>
-          <span class="info-value">{{ formatDateDisplay(accountInfo.dateStart) }} - {{ formatDateDisplay(accountInfo.dateEnd) }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Opening Balance:</span>
-          <span class="info-value">{{ accountInfo.openingBalance }} {{ accountInfo.currency }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Closing Balance:</span>
-          <span class="info-value">{{ accountInfo.closingBalance }} {{ accountInfo.currency }}</span>
-        </div>
-      </div>
-    </div>
-    
-    <div class="controls">
-      <!-- Query Type Selection -->
-      <div class="query-type">
-        <label>
-          <input type="radio" value="info" v-model="queryType" /> Info
-        </label>
-        <label>
-          <input type="radio" value="import" v-model="queryType" /> Import
-        </label>
-      </div>
-
-      <!-- Execute 1 day button -->
-      <div class="query-buttons">
-        <button @click="fetchOneDay">Execute 1 day</button>
-      </div>
-
-      <!-- Custom days input -->
-      <div class="custom-days">
-        <label>
-          Execute
-          <input 
-            type="number" 
-            v-model="customDays" 
-            min="1" 
-            max="90" 
-            placeholder="days" 
-          />
-          days
-        </label>
-        <button @click="fetchCustomDays">Execute</button>
-      </div>
-
-      <div>
-        <p>Last Update: {{ lastUpdated }}</p>
-      </div>
-    </div>
-
-    <!-- DataGrid -->
-    <DxDataGrid
-      :data-source="transactions"
-      :show-borders="true"
-      key-expr="id"
-      class="transactions-table"
-      :allow-column-reordering="true"
-      :allow-column-resizing="true"
-      :row-alternation-enabled="true"
-      @row-click="onRowClick"
-    >
-      <DxColumn data-field="id" caption="ID" width="100" alignment="center" />
-      <DxColumn data-field="date" caption="Date" data-type="date" width="120" alignment="center" />
-      <DxColumn data-field="amount" caption="Amount" width="100" alignment="right" cell-template="amountTemplate" />
-      <DxColumn data-field="currency" caption="Currency" width="80" alignment="center" />
-      <DxColumn data-field="counterAccount" caption="Counter Account" width="140" alignment="center" />
-      <DxColumn data-field="counterName" caption="Counter Name" width="200" alignment="left" />
-      <DxColumn data-field="bankCode" caption="Bank Code" width="100" alignment="center" />
-      <DxColumn data-field="bankName" caption="Bank Name" width="200" alignment="left" />
-      <DxColumn data-field="variableSymbol" caption="VS" width="100" alignment="center" />
-      <DxColumn data-field="message" caption="Message" width="250" alignment="left" />
-      <DxColumn data-field="type" caption="Type" width="150" alignment="center" />
-      <DxColumn data-field="executor" caption="Executed By" width="150" alignment="left" />
-      <DxColumn data-field="comment" caption="Comment" width="250" alignment="left" />
       
-      <!-- Status column (only visible in import mode) -->
-      <DxColumn 
-        v-if="queryType === 'import'" 
-        data-field="status" 
-        caption="Status" 
-        width="80" 
-        alignment="center"
-        cell-template="statusTemplate"
-      />
-
-      <template #amountTemplate="{ data }">
-        <span :class="{'positive': parseFloat(data.value) > 0, 'negative': parseFloat(data.value) < 0}">
-          {{ data.value }} {{ data.data.currency }}
-        </span>
-      </template>
+      <!-- Error message -->
+      <div v-if="errorMessage" class="error-toast toast toast-error show">
+        <p>{{ errorMessage }}</p>
+        <button class="close-btn" @click="errorMessage = ''">&times;</button>
+      </div>
       
-      <!-- Status indicator template -->
-      <template #statusTemplate="{ data }">
-        <div class="status-indicator-container">
-          <div :class="getStatusClass(data.value)" class="status-indicator"></div>
-          <span class="status-text">{{ getStatusText(data.value) }}</span>
-        </div>
-      </template>
-
-      <DxFilterRow :visible="true" />
-      <DxHeaderFilter :visible="true" />
-      <DxSearchPanel :visible="true" :highlight-case-sensitive="false" />
-      <DxColumnChooser :enabled="true" />
-      <DxSelection mode="multiple" />
-      <DxPaging :page-size="100" />
-      <DxPager :show-page-size-selector="true" :allowed-page-sizes="[10, 20, 50, 100]" />
-    </DxDataGrid>
-    
-    <!-- Transaction details modal -->
-    <div v-if="showTransactionDetails" class="transaction-details-modal">
-      <div class="transaction-details-content">
-        <div class="transaction-details-header">
-          <h2>Transaction Details</h2>
-          <button class="close-button" @click="showTransactionDetails = false">&times;</button>
+      <div class="page-header">
+        <div class="header-row">
+          <h1 class="page-title">Fio Transactions</h1>
+          <button @click="toggleControlPanel" class="btn-toggle-controls">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 15l-6-6-6 6" v-if="showControlPanel"/>
+              <path d="M6 9l6 6 6-6" v-else/>
+            </svg>
+            {{ showControlPanel ? 'Hide Controls' : 'Show Controls' }}
+          </button>
         </div>
         
-        <div class="transaction-details-body">
-          <div class="transaction-summary">
-            <div class="transaction-id">
-              <strong>Transaction ID:</strong> {{ selectedTransaction.id }}
+        <!-- Controls Panel -->
+        <div v-if="showControlPanel" class="controls-panel">
+          <div class="controls-left">
+            <!-- Query Type Selection -->
+            <div class="query-type">
+              <label class="radio-label">
+                <input type="radio" value="info" v-model="queryType" class="radio-input" />
+                <span class="radio-text">Info</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" value="import" v-model="queryType" class="radio-input" />
+                <span class="radio-text">Import</span>
+              </label>
             </div>
-            <div class="transaction-date">
-              <strong>Date:</strong> {{ selectedTransaction.date }}
-            </div>
-            <div class="transaction-amount">
-              <strong>Amount:</strong> 
-              <span :class="{'positive': parseFloat(selectedTransaction.amount) > 0, 'negative': parseFloat(selectedTransaction.amount) < 0}">
-                {{ selectedTransaction.amount }} {{ selectedTransaction.currency }}
-              </span>
-            </div>
+
+            <!-- Execute 1 day button -->
+            <button @click="fetchOneDay" class="btn btn-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              Execute 1 day
+            </button>
             
-            <!-- Status indicator in details (only in import mode) -->
-            <div v-if="queryType === 'import'" class="transaction-status">
-              <strong>Status:</strong>
-              <div class="status-detail">
-                <div :class="getStatusClass(selectedTransaction.status)" class="status-indicator"></div>
-                <span class="status-text">{{ getStatusText(selectedTransaction.status) }}</span>
-              </div>
-              <div v-if="selectedTransaction.statusMessage" class="status-message">
-                {{ selectedTransaction.statusMessage }}
-              </div>
+            <!-- Custom days input -->
+            <div class="custom-days">
+              <span>Execute</span>
+              <input 
+                type="number" 
+                v-model="customDays" 
+                min="1" 
+                max="90" 
+                placeholder="days" 
+                class="input-number"
+                aria-label="Number of days"
+              />
+              <span>days</span>
+              <button @click="fetchCustomDays" class="btn btn-outline">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                  <polyline points="16 7 22 7 22 13"></polyline>
+                </svg>
+                Execute
+              </button>
             </div>
           </div>
           
-          <div class="transaction-details-sections">
-            <div class="details-section">
-              <h3>Transaction Details</h3>
-              <table class="details-table">
-                <tbody>
-                  <tr>
-                    <td>Counter Account:</td>
-                    <td>{{ selectedTransaction.counterAccount || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Counter Name:</td>
-                    <td>{{ selectedTransaction.counterName || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Bank Code:</td>
-                    <td>{{ selectedTransaction.bankCode || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Bank Name:</td>
-                    <td>{{ selectedTransaction.bankName || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Variable Symbol:</td>
-                    <td>{{ selectedTransaction.variableSymbol || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Constant Symbol:</td>
-                    <td>{{ selectedTransaction.constantSymbol || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Specific Symbol:</td>
-                    <td>{{ selectedTransaction.specificSymbol || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>User ID:</td>
-                    <td>{{ selectedTransaction.userId || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Message:</td>
-                    <td>{{ selectedTransaction.message || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Transaction Type:</td>
-                    <td>{{ selectedTransaction.type || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Executed By:</td>
-                    <td>{{ selectedTransaction.executor || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Comment:</td>
-                    <td>{{ selectedTransaction.comment || 'N/A' }}</td>
-                  </tr>
-                  <tr>
-                    <td>Payment Order ID:</td>
-                    <td>{{ selectedTransaction.paymentOrderId || 'N/A' }}</td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="last-update">
+            Last update: {{ lastUpdated }}
+          </div>
+        </div>
+      </div>
+      
+      <!-- Account Info Summary with toggle -->
+      <div v-if="accountInfo" class="account-info-container">
+        <div class="account-info-header" @click="toggleAccountInfo">
+          <h2>Account Information</h2>
+          <button class="btn-toggle-info">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 15l-6-6-6 6" v-if="showAccountInfo"/>
+              <path d="M6 9l6 6 6-6" v-else/>
+            </svg>
+          </button>
+        </div>
+        <div v-if="showAccountInfo" class="account-info-content">
+          <div class="info-item">
+            <span class="info-label">Account:</span>
+            <span class="info-value">{{ accountInfo.accountId }}/{{ accountInfo.bankId }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">IBAN:</span>
+            <span class="info-value">{{ accountInfo.iban }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Currency:</span>
+            <span class="info-value">{{ accountInfo.currency }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Period:</span>
+            <span class="info-value">{{ formatDateDisplay(accountInfo.dateStart) }} - {{ formatDateDisplay(accountInfo.dateEnd) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Opening Balance:</span>
+            <span class="info-value">{{ accountInfo.openingBalance }} {{ accountInfo.currency }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Closing Balance:</span>
+            <span class="info-value">{{ accountInfo.closingBalance }} {{ accountInfo.currency }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DataGrid -->
+      <div class="data-grid-container">
+        <DxDataGrid
+          :data-source="transactions"
+          :show-borders="true"
+          key-expr="id"
+          class="transactions-table"
+          :allow-column-reordering="true"
+          :allow-column-resizing="true"
+          :row-alternation-enabled="true"
+          @row-click="onRowClick"
+          :no-data-text="'No transactions found'"
+        >
+          <!-- Import Status column (always visible) -->
+          <DxColumn 
+            data-field="status" 
+            caption="Status" 
+            width="60" 
+            alignment="center"
+            cell-template="statusTemplate"
+          />
+          
+          <DxColumn data-field="id" caption="ID" width="100" alignment="center" />
+          <DxColumn data-field="date" caption="Date" data-type="date" width="120" alignment="center" />
+          <DxColumn data-field="amount" caption="Amount" width="100" alignment="right" cell-template="amountTemplate" />
+          <DxColumn data-field="currency" caption="Currency" width="80" alignment="center" />
+          <DxColumn data-field="counterAccount" caption="Counter Account" width="140" alignment="center" />
+          <DxColumn data-field="counterName" caption="Counter Name" width="200" alignment="left" />
+          <DxColumn data-field="bankCode" caption="Bank Code" width="100" alignment="center" />
+          <DxColumn data-field="bankName" caption="Bank Name" width="200" alignment="left" />
+          <DxColumn data-field="constantSymbol" caption="KS" width="80" alignment="center" />
+          <DxColumn data-field="variableSymbol" caption="VS" width="100" alignment="center" />
+          <DxColumn data-field="userId" caption="User ID" width="200" alignment="left" />
+          <DxColumn data-field="type" caption="Type" width="150" alignment="center" />
+          <DxColumn data-field="comment" caption="Comment" width="250" alignment="left" />
+          <DxColumn data-field="paymentOrderId" caption="Payment Order ID" width="150" alignment="center" />
+
+          <template #amountTemplate="{ data }">
+            <span :class="{'positive': parseFloat(data.value) > 0, 'negative': parseFloat(data.value) < 0}">
+              {{ data.value }} {{ data.data.currency }}
+            </span>
+          </template>
+          
+          <!-- Status indicator template -->
+          <template #statusTemplate="{ data }">
+            <div class="status-indicator-container">
+              <div :class="['status-indicator', data.value || 'unknown']" :title="getStatusTitle(data.value)"></div>
+            </div>
+          </template>
+
+          <DxFilterRow :visible="true" />
+          <DxHeaderFilter :visible="true" />
+          <DxSearchPanel :visible="true" :highlight-case-sensitive="false" />
+          <DxColumnChooser :enabled="true" />
+          <DxSelection mode="multiple" />
+          <DxPaging :page-size="100" />
+          <DxPager :show-page-size-selector="true" :allowed-page-sizes="[10, 20, 50, 100]" />
+        </DxDataGrid>
+      </div>
+      
+      <!-- Transaction details modal -->
+      <div v-if="showTransactionDetails" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Transaction Details</h2>
+            <button class="close-btn" @click="showTransactionDetails = false">&times;</button>
+          </div>
+          
+          <div class="modal-body">
+            <div class="transaction-section">
+              <h3>Transaction Information</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Transaction ID:</span>
+                  <span class="info-value">{{ selectedTransaction.id }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Date:</span>
+                  <span class="info-value">{{ selectedTransaction.date }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Amount:</span>
+                  <span :class="['info-value', {'positive': parseFloat(selectedTransaction.amount) > 0, 'negative': parseFloat(selectedTransaction.amount) < 0}]">
+                    {{ selectedTransaction.amount }} {{ selectedTransaction.currency }}
+                  </span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Type:</span>
+                  <span class="info-value">{{ selectedTransaction.type || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Import Status:</span>
+                  <div class="status-with-indicator">
+                    <div :class="['status-indicator', selectedTransaction.status || 'unknown']" :title="getStatusTitle(selectedTransaction.status)"></div>
+                    <span class="info-value">{{ getStatusTitle(selectedTransaction.status) }}</span>
+                  </div>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Payment Order ID:</span>
+                  <span class="info-value">{{ selectedTransaction.paymentOrderId || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="transaction-section">
+              <h3>Counter Party Information</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Counter Account:</span>
+                  <span class="info-value">{{ selectedTransaction.counterAccount || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Counter Name:</span>
+                  <span class="info-value">{{ selectedTransaction.counterName || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Bank Code:</span>
+                  <span class="info-value">{{ selectedTransaction.bankCode || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Bank Name:</span>
+                  <span class="info-value">{{ selectedTransaction.bankName || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="transaction-section">
+              <h3>Payment Details</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Variable Symbol:</span>
+                  <span class="info-value">{{ selectedTransaction.variableSymbol || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Constant Symbol:</span>
+                  <span class="info-value">{{ selectedTransaction.constantSymbol || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Specific Symbol:</span>
+                  <span class="info-value">{{ selectedTransaction.specificSymbol || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">User ID:</span>
+                  <span class="info-value">{{ selectedTransaction.userId || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="transaction-section">
+              <h3>Additional Information</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Message:</span>
+                  <span class="info-value">{{ selectedTransaction.message || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Comment:</span>
+                  <span class="info-value">{{ selectedTransaction.comment || 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Executed By:</span>
+                  <span class="info-value">{{ selectedTransaction.executor || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status message section (only shown if there's a status message) -->
+            <div v-if="selectedTransaction.statusMessage" class="transaction-section">
+              <h3>Import Status Details</h3>
+              <div class="status-message-container">
+                <div :class="['status-message', getStatusMessageClass(selectedTransaction.status)]">
+                  {{ selectedTransaction.statusMessage }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </AppLayout>
 </template>
 
 <script>
@@ -255,6 +313,7 @@ import {
   DxColumnChooser,
   DxSelection
 } from "devextreme-vue/data-grid";
+import AppLayout from '~/layouts/AppLayout.vue';
 
 export default {
   components: {
@@ -266,7 +325,8 @@ export default {
     DxHeaderFilter,
     DxSearchPanel,
     DxColumnChooser,
-    DxSelection
+    DxSelection,
+    AppLayout
   },
   data() {
     return {
@@ -279,45 +339,54 @@ export default {
       errorMessage: "",
       showTransactionDetails: false,
       selectedTransaction: null,
-      apiUrl: "http://localhost:1880" // Base API URL
+      apiUrl: "http://35.180.124.4:1880", // Base API URL
+      showControlPanel: true, // Control panel visibility
+      showAccountInfo: true // Account info visibility
     };
   },
   methods: {
+    // Toggle control panel visibility
+    toggleControlPanel() {
+      this.showControlPanel = !this.showControlPanel;
+    },
+    
+    // Toggle account info visibility
+    toggleAccountInfo() {
+      this.showAccountInfo = !this.showAccountInfo;
+    },
+    
     // Row click handler
     onRowClick(e) {
       this.selectedTransaction = e.data;
       this.showTransactionDetails = true;
     },
     
-    // Get status class based on status value
-    getStatusClass(status) {
-      if (!status) return 'status-unknown';
+    // Get status title based on status value
+    getStatusTitle(status) {
+      if (!status) return 'Not imported';
       
-      switch(status.toLowerCase()) {
-        case 'success':
-          return 'status-success';
-        case 'warning':
-          return 'status-warning';
-        case 'error':
-          return 'status-error';
-        default:
-          return 'status-unknown';
-      }
+      const titles = {
+        'success': 'Successfully imported',
+        'warning': 'Imported with warnings',
+        'error': 'Import failed',
+        'unknown': 'Unknown status'
+      };
+      return titles[status.toLowerCase()] || 'Unknown status';
     },
     
-    // Get status text based on status value
-    getStatusText(status) {
-      if (!status) return 'Unknown';
+    // Get status message class based on status
+    getStatusMessageClass(status) {
+      if (!status) return 'unknown';
       
       switch(status.toLowerCase()) {
         case 'success':
-          return 'Success';
+          return 'success';
         case 'warning':
-          return 'Warning';
+          return 'warning';
         case 'error':
-          return 'Error';
+          return 'error';
         default:
-          return status;
+          return 'unknown';
       }
     },
     
@@ -345,8 +414,11 @@ export default {
         this.errorMessage = `Error: ${error.message}`;
         
         // For demo purposes, use sample data if API fails
-        const sampleData = this.parseTransactionData();
-        this.mapTransactions(sampleData);
+        if (this.queryType === "import") {
+          this.processSampleImportData();
+        } else {
+          this.processSampleInfoData();
+        }
       } finally {
         this.isLoading = false;
         this.updateLastUpdatedTime();
@@ -384,8 +456,11 @@ export default {
         this.errorMessage = `Error: ${error.message}`;
         
         // For demo purposes, use sample data if API fails
-        const sampleData = this.parseTransactionData();
-        this.mapTransactions(sampleData);
+        if (this.queryType === "import") {
+          this.processSampleImportData();
+        } else {
+          this.processSampleInfoData();
+        }
       } finally {
         this.isLoading = false;
         this.updateLastUpdatedTime();
@@ -416,10 +491,9 @@ export default {
       return date.toLocaleDateString();
     },
     
-    // Sample data for testing
-    parseTransactionData() {
-      // In a real application, this would come from your API
-      return {
+    // Process sample import data for testing
+    processSampleImportData() {
+      const sampleData = {
         fioImportData: {
           AccountStatement: {
             Info: [
@@ -429,29 +503,33 @@ export default {
                 currency: ["CZK"],
                 iban: ["CZ2320100000002101909941"],
                 bic: ["FIOBCZPPXXX"],
-                openingBalance: ["3734.28"],
-                closingBalance: ["4343.63"],
-                dateStart: ["2025-03-22+01:00"],
-                dateEnd: ["2025-03-24+01:00"],
-                idFrom: ["26973776676"],
-                idTo: ["26975570925"]
+                openingBalance: ["2568.28"],
+                closingBalance: ["2444.31"],
+                dateStart: ["2025-03-27+01:00"],
+                dateEnd: ["2025-03-29+01:00"],
+                idFrom: ["26979026236"],
+                idTo: ["26981622930"]
               }
             ],
             TransactionList: [
               {
                 Transaction: [
                   {
-                    column_22: [{"_": "26973776676", "$": {"name": "ID pohybu", "id": "22"}}],
-                    column_0: [{"_": "2025-03-22+01:00", "$": {"name": "Datum", "id": "0"}}],
-                    column_1: [{"_": "-151.50", "$": {"name": "Objem", "id": "1"}}],
+                    column_22: [{"_": "26979026236", "$": {"name": "ID pohybu", "id": "22"}}],
+                    column_0: [{"_": "2025-03-27+01:00", "$": {"name": "Datum", "id": "0"}}],
+                    column_1: [{"_": "2031.46", "$": {"name": "Objem", "id": "1"}}],
                     column_14: [{"_": "CZK", "$": {"name": "Měna", "id": "14"}}],
-                    column_5: [{"_": "9833", "$": {"name": "VS", "id": "5"}}],
-                    column_7: [{"_": "Nákup: BOLT.EU/O/2503210913, Tallinn, EE, dne 21.3.2025, částka  151.50 CZK", "$": {"name": "Uživatelská identifikace", "id": "7"}}],
-                    column_16: [{"_": "Nákup: BOLT.EU/O/2503210913, Tallinn, EE, dne 21.3.2025, částka  151.50 CZK", "$": {"name": "Zpráva pro příjemce", "id": "16"}}],
-                    column_8: [{"_": "Platba kartou", "$": {"name": "Typ", "id": "8"}}],
-                    column_9: [{"_": "Petrův, Ivan", "$": {"name": "Provedl", "id": "9"}}],
-                    column_25: [{"_": "Nákup: BOLT.EU/O/2503210913, Tallinn, EE, dne 21.3.2025, částka  151.50 CZK", "$": {"name": "Komentář", "id": "25"}}],
-                    column_17: [{"_": "37521058142", "$": {"name": "ID pokynu", "id": "17"}}]
+                    column_2: [{"_": "2533960302", "$": {"name": "Protiúčet", "id": "2"}}],
+                    column_10: [{"_": "STRIPE TECHNOLOGY EU", "$": {"name": "Název protiúčtu", "id": "10"}}],
+                    column_3: [{"_": "2600", "$": {"name": "Kód banky", "id": "3"}}],
+                    column_12: [{"_": "Citibank Europe plc, organizační složka", "$": {"name": "Název banky", "id": "12"}}],
+                    column_4: [{"_": "0000", "$": {"name": "KS", "id": "4"}}],
+                    column_5: [{"_": "0", "$": {"name": "VS", "id": "5"}}],
+                    column_7: [{"_": "STRIPE TECHNOLOGY EU", "$": {"name": "Uživatelská identifikace", "id": "7"}}],
+                    column_16: [{"_": "STRIPE", "$": {"name": "Zpráva pro příjemce", "id": "16"}}],
+                    column_8: [{"_": "Bezhotovostní příjem", "$": {"name": "Typ", "id": "8"}}],
+                    column_25: [{"_": "STRIPE TECHNOLOGY EU", "$": {"name": "Komentář", "id": "25"}}],
+                    column_17: [{"_": "37542066533", "$": {"name": "ID pokynu", "id": "17"}}]
                   }
                 ]
               }
@@ -463,12 +541,11 @@ export default {
             "$": {
               "version": "2.0",
               "id": "FIOImport",
-              "state": "ok",
-              "programVersion": "13802.10 SQL (5.11.2024)"
+              "state": "ok"
             },
             "rsp:responsePackItem": [
               {
-                "$": {"version": "2.0", "id": "FIO-081-001", "state": "ok"},
+                "$": {"version": "2.0", "id": "FIO-086-001", "state": "ok"},
                 "bnk:bankResponse": [
                   {
                     "$": {"version": "2.0", "state": "ok"},
@@ -478,7 +555,7 @@ export default {
                           {
                             "rdc:state": ["warning"],
                             "rdc:errno": ["603"],
-                            "rdc:note": ["Hodnota prvku musela bďż˝t upravena."]
+                            "rdc:note": ["Hodnota prvku musela být upravena."]
                           }
                         ]
                       }
@@ -490,6 +567,52 @@ export default {
           }
         }
       };
+      
+      this.mapTransactionsWithStatus(sampleData);
+    },
+    
+    // Process sample info data for testing
+    processSampleInfoData() {
+      const sampleData = {
+        accountStatement: {
+          info: {
+            accountId: "2101909941",
+            bankId: "2010",
+            currency: "CZK",
+            iban: "CZ2320100000002101909941",
+            bic: "FIOBCZPPXXX",
+            openingBalance: "2568.28",
+            closingBalance: "2444.31",
+            dateStart: "2025-03-27+01:00",
+            dateEnd: "2025-03-29+01:00",
+            idFrom: "26979026236",
+            idTo: "26981622930"
+          },
+          transactionList: {
+            transaction: [
+              {
+                column22: { value: "26979026236" },
+                column0: { value: "2025-03-27+01:00" },
+                column1: { value: "2031.46" },
+                column14: { value: "CZK" },
+                column2: { value: "2533960302" },
+                column10: { value: "STRIPE TECHNOLOGY EU" },
+                column3: { value: "2600" },
+                column12: { value: "Citibank Europe plc, organizační složka" },
+                column4: { value: "0000" },
+                column5: { value: "0" },
+                column7: { value: "STRIPE TECHNOLOGY EU" },
+                column16: { value: "STRIPE" },
+                column8: { value: "Bezhotovostní příjem" },
+                column25: { value: "STRIPE TECHNOLOGY EU" },
+                column17: { value: "37542066533" }
+              }
+            ]
+          }
+        }
+      };
+      
+      this.mapTransactions(sampleData);
     },
     
     // Map API data to DataGrid structure (for info mode)
@@ -534,7 +657,8 @@ export default {
           executor: tx.column9?.value,
           comment: tx.column25?.value,
           paymentOrderId: tx.column17?.value,
-          bic: tx.column26?.value
+          bic: tx.column26?.value,
+          status: null // No status in info mode
         };
       });
     },
@@ -667,140 +791,293 @@ export default {
 </script>
 
 <style>
-/* Global styles (not scoped to affect DevExtreme) */
-.transactions-container {
-  width: 100%;
-  min-height: 100vh;
-  background: white;
-  position: relative;
+:root {
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --text-color: #1f2937;
+  --text-light: #6b7280;
+  --border-color: #e5e7eb;
+  --bg-light: #f9fafb;
+  --bg-white: #ffffff;
 }
 
-.transactions-table {
-  width: 100%;
-  margin-top: 20px;
-}
-
-.controls {
+/* Estilos generales */
+.fio-dashboard {
+  padding: 20px;
+  height: 100%;
   display: flex;
+  flex-direction: column;
+}
+
+/* Header row with toggle button */
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+/* Toggle button for control panel */
+.btn-toggle-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-white);
+  color: var(--text-color);
+}
+
+.btn-toggle-controls:hover {
+  background-color: var(--bg-light);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.btn-toggle-controls .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Panel de controles */
+.controls-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  justify-content: space-around;
-  margin-bottom: 10px;
-  gap: 20px;
-  padding: 15px;
-  background-color: #f8f9fa;
-  border-radius: 5px;
-  align-items: center;
+  gap: 16px;
+  background-color: var(--bg-light);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
 }
 
-.query-type label {
-  margin-right: 15px;
-  font-weight: bold;
-}
-
-.query-buttons {
+.controls-left {
   display: flex;
   align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
+/* Botones */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-outline {
+  background-color: var(--bg-white);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
+.btn-outline:hover {
+  background-color: var(--bg-light);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Radio buttons */
+.query-type {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.radio-input {
+  margin: 0;
+}
+
+.radio-text {
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+/* Custom days input */
 .custom-days {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 14px;
+  color: var(--text-light);
 }
 
-.custom-days input {
+.input-number {
   width: 60px;
-  text-align: center;
-  margin: 0 5px;
-  padding: 5px;
-}
-
-button {
   padding: 8px 12px;
-  background-color: #3498db;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.input-number:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Última actualización */
+.last-update {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+/* Account info with toggle */
+.account-info-container {
+  margin-bottom: 20px;
+  background-color: var(--bg-light);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.account-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-light);
 }
 
-button:hover {
-  background-color: #2980b9;
+.account-info-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-color);
 }
 
-/* Status indicators */
-.status-indicator-container {
+.btn-toggle-info {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-light);
+  padding: 4px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
 }
 
-.status-indicator {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  display: inline-block;
+.btn-toggle-info .icon {
+  width: 18px;
+  height: 18px;
 }
 
-.status-success {
-  background-color: #2ecc71; /* Green */
-}
-
-.status-warning {
-  background-color: #f39c12; /* Orange */
-}
-
-.status-error {
-  background-color: #e74c3c; /* Red */
-}
-
-.status-unknown {
-  background-color: #95a5a6; /* Gray */
-}
-
-.status-text {
-  font-size: 12px;
-}
-
-.status-detail {
+.account-info-content {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: 10px;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+  background-color: var(--bg-white);
+  transition: all 0.3s ease;
 }
 
-.status-message {
-  margin-top: 5px;
+.info-item {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
   font-size: 12px;
-  color: #7f8c8d;
-  font-style: italic;
+  color: var(--text-light);
 }
 
-/* Loading overlay */
-.loading-overlay {
-  position: fixed;
+.info-value {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+/* Contenedor de la tabla */
+.data-grid-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Loading indicator */
+.loading-container {
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  z-index: 1000;
-  color: white;
+  justify-content: center;
+  background-color: var(--bg-white);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  z-index: 10;
 }
 
 .loading-spinner {
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top: 4px solid white;
   width: 40px;
   height: 40px;
+  border: 3px solid var(--bg-light);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
   animation: spin 1s linear infinite;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
+}
+
+.loading-text {
+  font-size: 16px;
+  color: var(--text-color);
+  font-weight: 500;
 }
 
 @keyframes spin {
@@ -808,35 +1085,106 @@ button:hover {
   100% { transform: rotate(360deg); }
 }
 
-/* Error message */
-.error-message {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background-color: #e74c3c;
-  color: white;
-  padding: 15px;
-  border-radius: 5px;
-  z-index: 1000;
-  max-width: 400px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+/* Tabla de transacciones */
+.transactions-table {
+  height: 100%;
+  width: 100%;
+}
+
+/* Personalización de DevExtreme */
+:deep(.dx-datagrid) {
+  background-color: var(--bg-white);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+:deep(.dx-datagrid-headers) {
+  background-color: var(--bg-light);
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+:deep(.dx-datagrid-rowsview) {
+  border-top: 1px solid var(--border-color);
+}
+
+:deep(.dx-datagrid-headers .dx-datagrid-table .dx-row > td) {
+  padding: 12px 16px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+:deep(.dx-datagrid-rowsview .dx-row > td) {
+  padding: 12px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+:deep(.dx-datagrid-rowsview .dx-row:hover) {
+  background-color: var(--bg-light);
+}
+
+:deep(.dx-datagrid-pager) {
+  padding: 12px;
+  background-color: var(--bg-white);
+  border-top: 1px solid var(--border-color);
+}
+
+:deep(.dx-button) {
+  border-radius: 6px;
+}
+
+/* Status indicators */
+.status-indicator-container {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.error-message button {
-  align-self: flex-end;
-  background-color: white;
-  color: #e74c3c;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 3px;
-  margin-top: 10px;
-  cursor: pointer;
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
-/* Transaction details modal */
-.transaction-details-modal {
+.status-indicator.success {
+  background-color: var(--success-color);
+}
+
+.status-indicator.warning {
+  background-color: var(--warning-color);
+}
+
+.status-indicator.error {
+  background-color: var(--error-color);
+}
+
+.status-indicator.unknown {
+  background-color: var(--text-light);
+}
+
+.status-text {
+  font-size: 12px;
+  color: var(--text-color);
+  margin-left: 6px;
+}
+
+/* Positive and negative values */
+.positive {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.negative {
+  color: var(--error-color);
+  font-weight: 600;
+}
+
+/* Modal */
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -846,142 +1194,159 @@ button:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1100;
+  z-index: 1000;
 }
 
-.transaction-details-content {
-  background-color: white;
+.modal-content {
+  background-color: var(--bg-white);
   border-radius: 8px;
   width: 90%;
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
-.transaction-details-header {
+.modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #eee;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-white);
+  z-index: 10;
 }
 
-.transaction-details-header h2 {
+.modal-header h2 {
   margin: 0;
-  font-size: 1.5rem;
-  color: #333;
+  font-size: 20px;
+  color: var(--text-color);
 }
 
-.close-button {
+.close-btn {
   background: none;
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #666;
+  color: var(--text-light);
+  padding: 0;
+  line-height: 1;
 }
 
-.transaction-details-body {
+.modal-body {
   padding: 20px;
 }
 
-.transaction-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 5px;
-  margin-bottom: 20px;
+/* Transaction sections in modal */
+.transaction-section {
+  margin-bottom: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-.transaction-summary > div {
-  flex: 1 1 200px;
+.transaction-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  padding: 12px 16px;
+  background-color: var(--bg-light);
+  border-bottom: 1px solid var(--border-color);
 }
 
-.transaction-status {
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.status-with-indicator {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  margin-top: 10px;
+  gap: 8px;
 }
 
-.transaction-details-sections {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+/* Status message container */
+.status-message-container {
+  padding: 16px;
 }
 
-.details-section {
-  flex: 1 1 400px;
+.status-message {
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-.details-section h3 {
-  margin-top: 0;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #eee;
+.status-message.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--success-color);
 }
 
-.details-table {
-  width: 100%;
-  border-collapse: collapse;
+.status-message.warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--warning-color);
 }
 
-.details-table td {
-  padding: 8px 5px;
-  border-bottom: 1px solid #eee;
+.status-message.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--error-color);
 }
 
-.details-table td:first-child {
-  font-weight: bold;
-  width: 40%;
+.status-message.unknown {
+  background-color: rgba(107, 114, 128, 0.1);
+  color: var(--text-light);
 }
 
-/* Styles for positive and negative values */
-.positive {
-  color: #27ae60;
-  font-weight: bold;
-}
-
-.negative {
-  color: #e74c3c;
-  font-weight: bold;
-}
-
-/* Account info styles */
-.account-info {
-  margin: 15px;
-  padding: 15px;
-  background-color: #f8f9fa;
-  border-radius: 5px;
-  border-left: 4px solid #3498db;
-}
-
-.account-info-header h2 {
-  margin-top: 0;
-  color: #2c3e50;
-  font-size: 1.2rem;
-}
-
-.account-info-content {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.info-item {
-  flex: 1 1 200px;
+/* Error toast */
+.error-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
+  padding: 12px 20px;
+  border-radius: 6px;
+  background-color: var(--bg-white);
+  border-left: 4px solid var(--error-color);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.info-label {
-  font-size: 0.8rem;
-  color: #7f8c8d;
+.error-toast p {
+  margin: 0 0 10px 0;
 }
 
-.info-value {
-  font-weight: bold;
-  color: #2c3e50;
+/* Responsive */
+@media (max-width: 768px) {
+  .controls-panel {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .controls-left {
+    width: 100%;
+  }
+  
+  .query-type {
+    margin-bottom: 10px;
+  }
+  
+  .custom-days {
+    margin-top: 10px;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-content {
+    width: 95%;
+    max-height: 95vh;
+  }
 }
 </style>
+

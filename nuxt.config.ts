@@ -1,8 +1,12 @@
 import { defineNuxtConfig } from "nuxt/config"
 
 export default defineNuxtConfig({
-  modules: ["@pinia/nuxt"],
-  css: ["devextreme/dist/css/dx.light.css", "vuetify/styles", "@mdi/font/css/materialdesignicons.css"],
+  modules: ["@pinia/nuxt", "@nuxtjs/tailwindcss"],
+css: [
+  "devextreme/dist/css/dx.light.css",
+  "vuetify/styles",
+  "@mdi/font/css/materialdesignicons.css",
+],
   build: {
     transpile: ["vuetify", "devextreme-vue"],
   },
@@ -18,4 +22,3 @@ export default defineNuxtConfig({
   },
   compatibilityDate: "2025-03-12",
 })
-

@@ -4,7 +4,7 @@
     <aside class="sidebar" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <div class="sidebar-header">
         <div class="logo-container">
-          <img src="https://via.placeholder.com/40" alt="Logo" class="logo" />
+          <img src="https://tlusty-praha.s23.cdn-upgates.com/_cache/d/6/d6a5fcfb0be6589e080ed53ffb09eb44-tlusty-logo-new-png.png" alt="Logo" class="logo" />
         </div>
         <button @click="toggleSidebar" class="toggle-btn">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

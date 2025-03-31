@@ -142,145 +142,6 @@
           <DxPager :show-page-size-selector="true" :allowed-page-sizes="[5, 10, 20]" />
         </DxDataGrid>
       </div>
-
-      <!-- Order Details Modal -->
-      <div v-if="showOrderModal" class="order-modal-overlay" @click.self="showOrderModal = false">
-        <div class="order-modal">
-          <div class="order-modal-header">
-            <h2>Order Details: {{ selectedOrder.order_number }}</h2>
-            <button class="close-button" @click="showOrderModal = false">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-          <div class="order-modal-content">
-            <div class="order-section">
-              <h3>Order Information</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Order Number:</span>
-                  <span class="info-value">{{ selectedOrder.order_number }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Status:</span>
-                  <span :class="['status-badge', getStatusClass(selectedOrder.status)]">{{ selectedOrder.status }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Created:</span>
-                  <span class="info-value">{{ selectedOrder.creation_time }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Last Update:</span>
-                  <span class="info-value">{{ selectedOrder.last_update_time }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Total Amount:</span>
-                  <span class="info-value price-value">{{ selectedOrder.order_total }} CZK</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Preforma Invoice:</span>
-                  <div class="proforma-status">
-                    <div :class="['status-indicator', getProformaIndicatorClass(selectedOrder.proformaInvoiceStatus)]"></div>
-                  </div>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Invoice Number:</span>
-                  <span class="info-value">{{ selectedOrder.invoice_number || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Import Status:</span>
-                  <div class="status-with-indicator">
-                    <div :class="['status-indicator', selectedOrder.importStatus]" :title="getStatusTitle(selectedOrder.importStatus)"></div>
-                    <span class="info-value">{{ getStatusTitle(selectedOrder.importStatus) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="order-section">
-              <h3>Customer Information</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Name:</span>
-                  <span class="info-value">{{ selectedOrder.customer.firstname_invoice }} {{ selectedOrder.customer.surname_invoice }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Email:</span>
-                  <span class="info-value">{{ selectedOrder.customer.email }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Phone:</span>
-                  <span class="info-value">{{ selectedOrder.customer.phone }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Address:</span>
-                  <span class="info-value">{{ selectedOrder.customer.street_invoice }}, {{ selectedOrder.customer.city_invoice }}, {{ selectedOrder.customer.zip_invoice }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="order-section">
-              <h3>Products</h3>
-              <div class="product-list-modal">
-                <div v-for="(product, index) in selectedOrder.products" :key="index" class="product-item-modal">
-                  <img :src="product.imageUrl" class="product-image" />
-                  <div class="product-info">
-                    <div class="product-header">
-                      <span class="product-quantity">{{ product.quantity }}x</span>
-                      <span class="product-title">{{ product.title }}</span>
-                    </div>
-                    <span class="product-price">{{ product.price }} CZK</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="order-section">
-              <h3>Shipping & Payment</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Shipping Method:</span>
-                  <span class="info-value">{{ selectedOrder.shipment ? selectedOrder.shipment.name : 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Payment Method:</span>
-                  <span class="info-value">{{ selectedOrder.payment ? selectedOrder.payment.name : 'N/A' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="order-section">
-              <h3>Import Log</h3>
-              <div class="import-log-modal">
-                <div 
-                  v-if="selectedOrder.showLog" 
-                  v-for="(line, index) in selectedOrder.importLog.split('\n')" 
-                  :key="index"
-                  :class="getLogLineClass(line)"
-                >
-                  {{ line }}
-                </div>
-                <button 
-                  v-if="!selectedOrder.showLog" 
-                  @click="toggleLogVisibility(selectedOrder)" 
-                  class="btn-show-log"
-                >
-                  Show Log
-                </button>
-                <button 
-                  v-else 
-                  @click="toggleLogVisibility(selectedOrder)" 
-                  class="btn-hide-log"
-                >
-                  Hide Log
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </AppLayout>
 </template>
@@ -311,11 +172,10 @@ export default {
       isLoading: true,
       selectedOrder: null,
       showOrderModal: false,
-      showControlPanel: true // New state to control panel visibility
+      showControlPanel: true
     };
   },
   methods: {
-    // Add method to toggle control panel visibility
     toggleControlPanel() {
       this.showControlPanel = !this.showControlPanel;
     },
@@ -512,19 +372,15 @@ export default {
       if (status.toLowerCase() === 'error') return 'status-cancelled';
       return status.toLowerCase() === 'issued' ? 'status-active' : 'status-pending';
     },
+    // Modified to navigate to Order/[id] instead of showing modal
     showOrderDetails(e) {
       const order = e.data;
-      this.selectedOrder = order;
-      this.showOrderModal = true;
+      this.$router.push(`/ecommerce/Order/${order.order_number}`);
     },
-    // Add a method to toggle log visibility
     toggleLogVisibility(order) {
-      // Toggle the showLog property for this specific order
       order.showLog = !order.showLog;
-      // Force a re-render
       this.orders = [...this.orders];
     },
-    // Update the getProformaIndicatorClass method to only use success or error (no warning)
     getProformaIndicatorClass(status) {
       if (!status) return 'error';
       if (status.toLowerCase() === 'error') return 'error';
@@ -543,6 +399,7 @@ export default {
 </script>
 
 <style>
+/* Styles remain unchanged */
 :root {
   --primary-color: #3b82f6;
   --primary-hover: #2563eb;
@@ -965,188 +822,6 @@ export default {
   border-left: 4px solid var(--primary-color);
 }
 
-/* Order Modal */
-.order-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.order-modal {
-  background-color: var(--bg-white);
-  border-radius: 8px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  width: 90%;
-  max-width: 900px;
-  max-height: 90vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.order-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
-  position: sticky;
-  top: 0;
-  background-color: var(--bg-white);
-  z-index: 10;
-  border-radius: 8px 8px 0 0;
-}
-
-.order-modal-header h2 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.close-button:hover {
-  background-color: var(--bg-light);
-}
-
-.close-button .icon {
-  width: 20px;
-  height: 20px;
-}
-
-.order-modal-content {
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.order-section {
-  margin-bottom: 24px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.order-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
-  padding: 12px 16px;
-  background-color: var(--bg-light);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 16px;
-  padding: 16px;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.info-label {
-  font-size: 12px;
-  color: var(--text-light);
-  font-weight: 500;
-}
-
-.info-value {
-  font-size: 14px;
-  color: var(--text-color);
-}
-
-.product-list-modal {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.product-item-modal {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 6px;
-  background-color: var(--bg-light);
-}
-
-.import-log-modal {
-  padding: 16px;
-  font-family: monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  background-color: #f8f9fa;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.status-na {
-  background-color: rgba(107, 114, 128, 0.1);
-  color: var(--text-light);
-}
-
-.status-pending {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: var(--warning-color);
-}
-
-/* Make sure warnings are green as requested */
-.status-indicator.warning {
-  background-color: var(--success-color);
-}
-
-.log-warning {
-  color: var(--warning-color);
-}
-
-.proforma-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-with-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-@media (max-width: 768px) {
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .order-modal {
-    width: 95%;
-    max-height: 95vh;
-  }
-}
-
 /* Custom styles for the log buttons */
 .btn-show-log,
 .btn-hide-log {
@@ -1181,4 +856,3 @@ export default {
   background-color: var(--primary-hover);
 }
 </style>
-

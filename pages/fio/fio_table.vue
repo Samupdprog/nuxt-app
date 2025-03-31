@@ -178,125 +178,6 @@
           <DxPager :show-page-size-selector="true" :allowed-page-sizes="[10, 20, 50, 100]" />
         </DxDataGrid>
       </div>
-      
-      <!-- Transaction details modal -->
-      <div v-if="showTransactionDetails" class="modal-overlay">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2>Transaction Details</h2>
-            <button class="close-btn" @click="showTransactionDetails = false">&times;</button>
-          </div>
-          
-          <div class="modal-body">
-            <div class="transaction-section">
-              <h3>Transaction Information</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Transaction ID:</span>
-                  <span class="info-value">{{ selectedTransaction.id }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Date:</span>
-                  <span class="info-value">{{ selectedTransaction.date }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Amount:</span>
-                  <span :class="['info-value', {'positive': parseFloat(selectedTransaction.amount) > 0, 'negative': parseFloat(selectedTransaction.amount) < 0}]">
-                    {{ selectedTransaction.amount }} {{ selectedTransaction.currency }}
-                  </span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Type:</span>
-                  <span class="info-value">{{ selectedTransaction.type || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Import Status:</span>
-                  <div class="status-with-indicator">
-                    <div :class="['status-indicator', selectedTransaction.status || 'unknown']" :title="getStatusTitle(selectedTransaction.status)"></div>
-                    <span class="info-value">{{ getStatusTitle(selectedTransaction.status) }}</span>
-                  </div>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Payment Order ID:</span>
-                  <span class="info-value">{{ selectedTransaction.paymentOrderId || 'N/A' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="transaction-section">
-              <h3>Counter Party Information</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Counter Account:</span>
-                  <span class="info-value">{{ selectedTransaction.counterAccount || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Counter Name:</span>
-                  <span class="info-value">{{ selectedTransaction.counterName || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Bank Code:</span>
-                  <span class="info-value">{{ selectedTransaction.bankCode || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Bank Name:</span>
-                  <span class="info-value">{{ selectedTransaction.bankName || 'N/A' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="transaction-section">
-              <h3>Payment Details</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Variable Symbol:</span>
-                  <span class="info-value">{{ selectedTransaction.variableSymbol || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Constant Symbol:</span>
-                  <span class="info-value">{{ selectedTransaction.constantSymbol || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Specific Symbol:</span>
-                  <span class="info-value">{{ selectedTransaction.specificSymbol || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">User ID:</span>
-                  <span class="info-value">{{ selectedTransaction.userId || 'N/A' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="transaction-section">
-              <h3>Additional Information</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Message:</span>
-                  <span class="info-value">{{ selectedTransaction.message || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Comment:</span>
-                  <span class="info-value">{{ selectedTransaction.comment || 'N/A' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Executed By:</span>
-                  <span class="info-value">{{ selectedTransaction.executor || 'N/A' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Status message section (only shown if there's a status message) -->
-            <div v-if="selectedTransaction.statusMessage" class="transaction-section">
-              <h3>Import Status Details</h3>
-              <div class="status-message-container">
-                <div :class="['status-message', getStatusMessageClass(selectedTransaction.status)]">
-                  {{ selectedTransaction.statusMessage }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </AppLayout>
 </template>
@@ -337,8 +218,6 @@ export default {
       customDays: 7, // Default to 7 days
       isLoading: false,
       errorMessage: "",
-      showTransactionDetails: false,
-      selectedTransaction: null,
       apiUrl: "http://35.180.124.4:1880", // Base API URL
       showControlPanel: true, // Control panel visibility
       showAccountInfo: true // Account info visibility
@@ -355,10 +234,19 @@ export default {
       this.showAccountInfo = !this.showAccountInfo;
     },
     
-    // Row click handler
+    // Row click handler - now redirects to transaction details page
     onRowClick(e) {
-      this.selectedTransaction = e.data;
-      this.showTransactionDetails = true;
+      // Store transaction data in localStorage to access it on the details page
+      localStorage.setItem('selectedTransaction', JSON.stringify(e.data));
+      
+      // Navigate to transaction details page
+      this.$router.push({
+        path: `/fio/transaction/${e.data.id}`,
+        query: { 
+          status: e.data.status,
+          date: e.data.date
+        }
+      });
     },
     
     // Get status title based on status value
@@ -369,6 +257,7 @@ export default {
         'success': 'Successfully imported',
         'warning': 'Imported with warnings',
         'error': 'Import failed',
+        'already-imported': 'Already imported to Pohoda',
         'unknown': 'Unknown status'
       };
       return titles[status.toLowerCase()] || 'Unknown status';
@@ -385,6 +274,8 @@ export default {
           return 'warning';
         case 'error':
           return 'error';
+        case 'already-imported':
+          return 'already-imported';
         default:
           return 'unknown';
       }
@@ -545,20 +436,11 @@ export default {
             },
             "rsp:responsePackItem": [
               {
-                "$": {"version": "2.0", "id": "FIO-086-001", "state": "ok"},
-                "bnk:bankResponse": [
+                "$": {"version": "2.0", "id": "FIO-086-001", "state": "error", "note": "Importovaný záznam již existuje."},
+                "rsp:errorDetail": [
                   {
-                    "$": {"version": "2.0", "state": "ok"},
-                    "rdc:importDetails": [
-                      {
-                        "rdc:detail": [
-                          {
-                            "rdc:state": ["warning"],
-                            "rdc:errno": ["603"],
-                            "rdc:note": ["Hodnota prvku musela být upravena."]
-                          }
-                        ]
-                      }
+                    "rsp:recordDuplicity": [
+                      {"rsp:agendaType": ["banka"], "rsp:dateCreate": ["2025-03-31"], "rsp:id": ["37698"]}
                     ]
                   }
                 ]
@@ -686,6 +568,9 @@ export default {
       // Process transactions
       const transactions = data.fioImportData?.AccountStatement?.TransactionList?.[0]?.Transaction || [];
       
+      // Get response items from Pohoda
+      const responseItems = data.pohodaResponse?.["rsp:responsePack"]?.["rsp:responsePackItem"] || [];
+      
       this.transactions = transactions.map((tx, index) => {
         // Extract transaction ID
         const txId = tx.column_22 && tx.column_22[0] ? tx.column_22[0]._ : '';
@@ -694,58 +579,64 @@ export default {
         let status = 'unknown';
         let statusMessage = '';
         
-        if (data.pohodaResponse && data.pohodaResponse["rsp:responsePack"]) {
-          const responseItems = data.pohodaResponse["rsp:responsePack"]["rsp:responsePackItem"] || [];
+        // Find the corresponding response item for this transaction
+        if (index < responseItems.length) {
+          const responseItem = responseItems[index];
+          const itemState = responseItem.$ ? responseItem.$.state : '';
+          const itemNote = responseItem.$ ? responseItem.$.note : '';
           
-          // Find matching response item (using index as a simple way to match)
-          if (responseItems[index]) {
-            const itemState = responseItems[index].$ ? responseItems[index].$.state : '';
-            
-            if (itemState === 'ok') {
-              // Check for warnings or errors in details
-              const bankResponse = responseItems[index]["bnk:bankResponse"];
-              if (bankResponse && bankResponse[0] && bankResponse[0]["rdc:importDetails"]) {
-                const details = bankResponse[0]["rdc:importDetails"][0]["rdc:detail"] || [];
-                
-                // Check for errors first
-                const hasErrors = details.some(detail => 
+          // Check if the record already exists in Pohoda - look for the specific message
+          if (itemState === 'error' && itemNote && (
+              itemNote.includes("Importovaný záznam již existuje") || 
+              itemNote.includes("Importovanďż˝ zďż˝znam jiďż˝ existuje")
+            )) {
+            status = 'already-imported';
+            statusMessage = itemNote;
+          } else if (itemState === 'ok') {
+            // Check for warnings or errors in details
+            const bankResponse = responseItem["bnk:bankResponse"];
+            if (bankResponse && bankResponse[0] && bankResponse[0]["rdc:importDetails"]) {
+              const details = bankResponse[0]["rdc:importDetails"][0]["rdc:detail"] || [];
+              
+              // Check for errors first
+              const hasErrors = details.some(detail => 
+                detail["rdc:state"] && detail["rdc:state"][0] === "error"
+              );
+              
+              if (hasErrors) {
+                status = 'error';
+                // Get first error message
+                const errorDetail = details.find(detail => 
                   detail["rdc:state"] && detail["rdc:state"][0] === "error"
                 );
-                
-                if (hasErrors) {
-                  status = 'error';
-                  // Get first error message
-                  const errorDetail = details.find(detail => 
-                    detail["rdc:state"] && detail["rdc:state"][0] === "error"
-                  );
-                  if (errorDetail && errorDetail["rdc:note"]) {
-                    statusMessage = errorDetail["rdc:note"][0];
-                  }
-                } 
-                // Then check for warnings
-                else if (details.some(detail => 
-                  detail["rdc:state"] && detail["rdc:state"][0] === "warning"
-                )) {
-                  status = 'warning';
-                  // Get first warning message
-                  const warningDetail = details.find(detail => 
-                    detail["rdc:state"] && detail["rdc:state"][0] === "warning"
-                  );
-                  if (warningDetail && warningDetail["rdc:note"]) {
-                    statusMessage = warningDetail["rdc:note"][0];
-                  }
-                } 
-                // If no errors or warnings, it's a success
-                else {
-                  status = 'success';
+                if (errorDetail && errorDetail["rdc:note"]) {
+                  statusMessage = errorDetail["rdc:note"][0];
                 }
-              } else {
+              } 
+              // Then check for warnings
+              else if (details.some(detail => 
+                detail["rdc:state"] && detail["rdc:state"][0] === "warning"
+              )) {
+                status = 'warning';
+                // Get first warning message
+                const warningDetail = details.find(detail => 
+                  detail["rdc:state"] && detail["rdc:state"][0] === "warning"
+                );
+                if (warningDetail && warningDetail["rdc:note"]) {
+                  statusMessage = warningDetail["rdc:note"][0];
+                }
+              } 
+              // If no errors or warnings, it's a success
+              else {
                 status = 'success';
               }
             } else {
-              status = 'error';
-              statusMessage = 'Transaction processing failed';
+              status = 'success';
             }
+          } else if (itemState === 'error') {
+            // For other errors that are not "already imported"
+            status = 'error';
+            statusMessage = itemNote || 'Transaction processing failed';
           }
         }
         
@@ -797,6 +688,7 @@ export default {
   --success-color: #10b981;
   --warning-color: #f59e0b;
   --error-color: #ef4444;
+  --already-imported-color: #3b82f6; /* Blue color for already imported status */
   --text-color: #1f2937;
   --text-light: #6b7280;
   --border-color: #e5e7eb;
@@ -1162,6 +1054,10 @@ export default {
   background-color: var(--error-color);
 }
 
+.status-indicator.already-imported {
+  background-color: var(--already-imported-color);
+}
+
 .status-indicator.unknown {
   background-color: var(--text-light);
 }
@@ -1181,143 +1077,6 @@ export default {
 .negative {
   color: var(--error-color);
   font-weight: 600;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background-color: var(--bg-white);
-  border-radius: 8px;
-  width: 90%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
-  position: sticky;
-  top: 0;
-  background-color: var(--bg-white);
-  z-index: 10;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 20px;
-  color: var(--text-color);
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--text-light);
-  padding: 0;
-  line-height: 1;
-}
-
-.modal-body {
-  padding: 20px;
-}
-
-/* Transaction sections in modal */
-.transaction-section {
-  margin-bottom: 24px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.transaction-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
-  padding: 12px 16px;
-  background-color: var(--bg-light);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 16px;
-  padding: 16px;
-}
-
-.status-with-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Status message container */
-.status-message-container {
-  padding: 16px;
-}
-
-.status-message {
-  padding: 12px;
-  border-radius: 6px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.status-message.success {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: var(--success-color);
-}
-
-.status-message.warning {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: var(--warning-color);
-}
-
-.status-message.error {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--error-color);
-}
-
-.status-message.unknown {
-  background-color: rgba(107, 114, 128, 0.1);
-  color: var(--text-light);
-}
-
-/* Error toast */
-.error-toast {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  padding: 12px 20px;
-  border-radius: 6px;
-  background-color: var(--bg-white);
-  border-left: 4px solid var(--error-color);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.error-toast p {
-  margin: 0 0 10px 0;
 }
 
 /* Responsive */
@@ -1342,11 +1101,5 @@ export default {
   .info-grid {
     grid-template-columns: 1fr;
   }
-  
-  .modal-content {
-    width: 95%;
-    max-height: 95vh;
-  }
 }
 </style>
-

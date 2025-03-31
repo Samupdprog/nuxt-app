@@ -15,7 +15,7 @@
       </div>
 
       <div class="user-profile" v-if="!sidebarCollapsed">
-        <img src="https://randomuser.me/api/portraits/men/85.jpg" alt="User Avatar" class="avatar" />
+        <img src="https://tlusty-praha.s23.cdn-upgates.com/_cache/d/6/d6a5fcfb0be6589e080ed53ffb09eb44-tlusty-logo-new-png.png" alt="User Avatar" class="avatar" />
         <div class="user-info">
           <div class="user-name">Admin</div>
           <div class="user-email">admin@example.com</div>

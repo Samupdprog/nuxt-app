@@ -3,34 +3,34 @@ import { Server } from 'node:http';
 import { resolve, dirname, join } from 'node:path';
 import nodeCrypto from 'node:crypto';
 import { parentPort, threadId } from 'node:worker_threads';
-import { getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, getRequestURL, getResponseHeader, defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, sendRedirect, proxyRequest, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, createError, getRouterParam, readBody, getQuery as getQuery$1, getResponseStatusText } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/h3/dist/index.mjs';
-import { createRenderer, getRequestDependencies, getPreloadLinks, getPrefetchLinks } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/vue-bundle-renderer/dist/runtime.mjs';
-import destr from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/destr/dist/index.mjs';
-import { withQuery, joinURL, withTrailingSlash, parseURL, withoutBase, getQuery, joinRelativeURL } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/ufo/dist/index.mjs';
-import { createHead as createHead$1, propsToString, renderSSRHead } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/unhead/dist/server.mjs';
-import { isVNode, toValue, isRef } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/vue/index.mjs';
-import { walkResolver } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/unhead/dist/utils.mjs';
-import { renderToString } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/vue/server-renderer/index.mjs';
-import { klona } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/klona/dist/index.mjs';
-import defu, { defuFn } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/defu/dist/defu.mjs';
-import { snakeCase } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/scule/dist/index.mjs';
-import { stringify, uneval } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/devalue/index.js';
-import { DeprecationsPlugin, PromisesPlugin, TemplateParamsPlugin, AliasSortingPlugin } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/unhead/dist/plugins.mjs';
-import { createHooks } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/hookable/dist/index.mjs';
-import { createFetch, Headers as Headers$1 } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/ofetch/dist/node.mjs';
-import { fetchNodeRequestHandler, callNodeRequestHandler } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/node-mock-http/dist/index.mjs';
+import { getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, getRequestURL, getResponseHeader, defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, sendRedirect, proxyRequest, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, createError, getRouterParam, readBody, getQuery as getQuery$1, getResponseStatusText } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/h3/dist/index.mjs';
+import { createRenderer, getRequestDependencies, getPreloadLinks, getPrefetchLinks } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/vue-bundle-renderer/dist/runtime.mjs';
+import destr from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/destr/dist/index.mjs';
+import { withQuery, joinURL, withTrailingSlash, parseURL, withoutBase, getQuery, joinRelativeURL } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/ufo/dist/index.mjs';
+import { createHead as createHead$1, propsToString, renderSSRHead } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/unhead/dist/server.mjs';
+import { isVNode, toValue, isRef } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/vue/index.mjs';
+import { walkResolver } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/unhead/dist/utils.mjs';
+import { renderToString } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/vue/server-renderer/index.mjs';
+import { klona } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/klona/dist/index.mjs';
+import defu, { defuFn } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/defu/dist/defu.mjs';
+import { snakeCase } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/scule/dist/index.mjs';
+import { stringify, uneval } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/devalue/index.js';
+import { DeprecationsPlugin, PromisesPlugin, TemplateParamsPlugin, AliasSortingPlugin } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/unhead/dist/plugins.mjs';
+import { createHooks } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/hookable/dist/index.mjs';
+import { createFetch, Headers as Headers$1 } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/ofetch/dist/node.mjs';
+import { fetchNodeRequestHandler, callNodeRequestHandler } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/node-mock-http/dist/index.mjs';
 import { readFile } from 'node:fs/promises';
-import consola, { consola as consola$1 } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/consola/dist/index.mjs';
-import { ErrorParser } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/youch-core/build/index.js';
-import { Youch } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/youch/build/index.js';
-import { SourceMapConsumer } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/source-map/source-map.js';
+import consola, { consola as consola$1 } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/consola/dist/index.mjs';
+import { ErrorParser } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/youch-core/build/index.js';
+import { Youch } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/youch/build/index.js';
+import { SourceMapConsumer } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/source-map/source-map.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { getContext } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/unctx/dist/index.mjs';
-import { captureRawStackTrace, parseRawStackTrace } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/errx/dist/index.js';
-import { createStorage, prefixStorage } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/unstorage/dist/index.mjs';
-import unstorage_47drivers_47fs from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/unstorage/drivers/fs.mjs';
-import { digest } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/ohash/dist/index.mjs';
-import { toRouteMatcher, createRouter } from 'file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/node_modules/radix3/dist/index.mjs';
+import { getContext } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/unctx/dist/index.mjs';
+import { captureRawStackTrace, parseRawStackTrace } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/errx/dist/index.js';
+import { createStorage, prefixStorage } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/unstorage/dist/index.mjs';
+import unstorage_47drivers_47fs from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/unstorage/drivers/fs.mjs';
+import { digest } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/ohash/dist/index.mjs';
+import { toRouteMatcher, createRouter } from 'file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/node_modules/radix3/dist/index.mjs';
 
 function isJsonRequest(event) {
   if (hasReqHeader(event, "accept", "text/html")) {
@@ -241,13 +241,13 @@ if (!window.__NUXT_DEVTOOLS_TIME_METRIC__) {
 window.__NUXT_DEVTOOLS_TIME_METRIC__.appInit = Date.now()
 `;
 
-const _hnYYCLOb9PlCudTG1iU17jwIkW6A8K8KNMpmGXTCA = (function(nitro) {
+const _LVuKl_goUzMdIALVTfJgDBLgrbxTArkOy5NX05m1z8 = (function(nitro) {
   nitro.hooks.hook("render:html", (htmlContext) => {
     htmlContext.head.push(`<script>${script}<\/script>`);
   });
 });
 
-const rootDir = "C:/Users/Samuel/Documents/Empresa/prueba proyecto empresa/node-red-testv2/my-nuxt-app";
+const rootDir = "C:/Users/Samuel/Documents/Empresa/my-nuxt-app";
 
 const appHead = {"meta":[{"name":"viewport","content":"width=device-width, initial-scale=1"},{"charset":"utf-8"}],"link":[],"style":[],"script":[],"noscript":[]};
 
@@ -266,7 +266,7 @@ const devReducers = {
   URL: (data) => data instanceof URL ? data.toString() : void 0
 };
 const asyncContext = getContext("nuxt-dev", { asyncContext: true, AsyncLocalStorage });
-const _p01hRhc8pZmnuBfyDUPBa8ZI3YPB8M3rZptWDTe_o = (nitroApp) => {
+const _0ZebJSnkF5yC6q__J6RGzGQ1PdMYjk783JiDbf533g = (nitroApp) => {
   const handler = nitroApp.h3App.handler;
   nitroApp.h3App.handler = (event) => {
     return asyncContext.callAsync({ logs: [], event }, () => handler(event));
@@ -336,18 +336,18 @@ function onConsoleLog(callback) {
 }
 
 const plugins = [
-  _hnYYCLOb9PlCudTG1iU17jwIkW6A8K8KNMpmGXTCA,
-_p01hRhc8pZmnuBfyDUPBa8ZI3YPB8M3rZptWDTe_o
+  _LVuKl_goUzMdIALVTfJgDBLgrbxTArkOy5NX05m1z8,
+_0ZebJSnkF5yC6q__J6RGzGQ1PdMYjk783JiDbf533g
 ];
 
-const _lazy_XXwtqk = () => Promise.resolve().then(function () { return renderer$1; });
+const _lazy_eMTxk1 = () => Promise.resolve().then(function () { return renderer$1; });
 
 const handlers = [
-  { route: '/__nuxt_error', handler: _lazy_XXwtqk, lazy: true, middleware: false, method: undefined },
-  { route: '/**', handler: _lazy_XXwtqk, lazy: true, middleware: false, method: undefined }
+  { route: '/__nuxt_error', handler: _lazy_eMTxk1, lazy: true, middleware: false, method: undefined },
+  { route: '/**', handler: _lazy_eMTxk1, lazy: true, middleware: false, method: undefined }
 ];
 
-const serverAssets = [{"baseName":"server","dir":"C:/Users/Samuel/Documents/Empresa/prueba proyecto empresa/node-red-testv2/my-nuxt-app/server/assets"}];
+const serverAssets = [{"baseName":"server","dir":"C:/Users/Samuel/Documents/Empresa/my-nuxt-app/server/assets"}];
 
 const assets = createStorage();
 
@@ -359,11 +359,11 @@ const storage = createStorage({});
 
 storage.mount('/assets', assets);
 
-storage.mount('root', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"C:/Users/Samuel/Documents/Empresa/prueba proyecto empresa/node-red-testv2/my-nuxt-app","watchOptions":{"ignored":[null]}}));
-storage.mount('src', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"C:/Users/Samuel/Documents/Empresa/prueba proyecto empresa/node-red-testv2/my-nuxt-app/server","watchOptions":{"ignored":[null]}}));
-storage.mount('build', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"C:/Users/Samuel/Documents/Empresa/prueba proyecto empresa/node-red-testv2/my-nuxt-app/.nuxt"}));
-storage.mount('cache', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"C:/Users/Samuel/Documents/Empresa/prueba proyecto empresa/node-red-testv2/my-nuxt-app/.nuxt/cache"}));
-storage.mount('data', unstorage_47drivers_47fs({"driver":"fs","base":"C:/Users/Samuel/Documents/Empresa/prueba proyecto empresa/node-red-testv2/my-nuxt-app/.data/kv"}));
+storage.mount('root', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"C:/Users/Samuel/Documents/Empresa/my-nuxt-app","watchOptions":{"ignored":[null]}}));
+storage.mount('src', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"C:/Users/Samuel/Documents/Empresa/my-nuxt-app/server","watchOptions":{"ignored":[null]}}));
+storage.mount('build', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"C:/Users/Samuel/Documents/Empresa/my-nuxt-app/.nuxt"}));
+storage.mount('cache', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"C:/Users/Samuel/Documents/Empresa/my-nuxt-app/.nuxt/cache"}));
+storage.mount('data', unstorage_47drivers_47fs({"driver":"fs","base":"C:/Users/Samuel/Documents/Empresa/my-nuxt-app/.data/kv"}));
 
 function useStorage(base = "") {
   return base ? prefixStorage(storage, base) : storage;
@@ -1448,8 +1448,8 @@ function publicAssetsURL(...path) {
 
 const APP_ROOT_OPEN_TAG = `<${appRootTag}${propsToString(appRootAttrs)}>`;
 const APP_ROOT_CLOSE_TAG = `</${appRootTag}>`;
-const getClientManifest = () => import('file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/.nuxt/dist/server/client.manifest.mjs').then((r) => r.default || r).then((r) => typeof r === "function" ? r() : r);
-const getServerEntry = () => import('file://C:/Users/Samuel/Documents/Empresa/prueba%20proyecto%20empresa/node-red-testv2/my-nuxt-app/.nuxt/dist/server/server.mjs').then((r) => r.default || r);
+const getClientManifest = () => import('file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/.nuxt/dist/server/client.manifest.mjs').then((r) => r.default || r).then((r) => typeof r === "function" ? r() : r);
+const getServerEntry = () => import('file://C:/Users/Samuel/Documents/Empresa/my-nuxt-app/.nuxt/dist/server/server.mjs').then((r) => r.default || r);
 const getSSRStyles = lazyCachedFunction(() => Promise.resolve().then(function () { return styles$1; }).then((r) => r.default || r));
 const getSSRRenderer = lazyCachedFunction(async () => {
   const manifest = await getClientManifest();

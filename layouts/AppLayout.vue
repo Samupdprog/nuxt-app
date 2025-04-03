@@ -23,7 +23,7 @@
       </div>
       
       <div class="user-profile-collapsed" v-else>
-        <img src="https://randomuser.me/api/portraits/men/85.jpg" alt="User Avatar" class="avatar-small" />
+        <img src="https://tlusty-praha.s23.cdn-upgates.com/_cache/d/6/d6a5fcfb0be6589e080ed53ffb09eb44-tlusty-logo-new-png.png" alt="User Avatar" class="avatar-small" />
       </div>
 
       <div class="sidebar-divider"></div>

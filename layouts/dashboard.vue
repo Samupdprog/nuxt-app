@@ -1,76 +1,7 @@
 <template>
+  <AppLayout>
   <div class="app-container">
-    <!-- Left Navigation Sidebar -->
-    <aside class="sidebar" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-      <div class="sidebar-header">
-        <div class="user-profile">
-          <img 
-            :src="uiStore.userInfo.avatar || 'https://randomuser.me/api/portraits/men/85.jpg'" 
-            alt="User avatar" 
-            class="user-avatar"
-          />
-          <div class="user-info" v-if="!sidebarCollapsed">
-            <h3 class="user-name">{{ uiStore.userInfo.name || 'Admin' }}</h3>
-            <p class="user-email">{{ uiStore.userInfo.email || 'admin@example.com' }}</p>
-          </div>
-        </div>
-        <button class="toggle-sidebar" @click="toggleSidebar">
-          <i class="fas" :class="sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
-        </button>
-      </div>
-
-      <div class="sidebar-divider"></div>
-
-      <nav class="sidebar-nav">
-        <router-link to="/dashboard" class="nav-item" active-class="active">
-          <i class="fas fa-tachometer-alt"></i>
-          <span v-if="!sidebarCollapsed">Dashboard</span>
-        </router-link>
-        
-        <div class="nav-group">
-          <div class="nav-group-header" @click="toggleEcommerceMenu">
-            <i class="fas fa-shopping-cart"></i>
-            <span v-if="!sidebarCollapsed">E-commerce to Pohoda</span>
-            <i v-if="!sidebarCollapsed" class="fas" :class="ecommerceMenuOpen ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
-          </div>
-          <div class="nav-group-items" v-if="ecommerceMenuOpen || !sidebarCollapsed">
-            <router-link to="/ecommerce/products/products_table" class="nav-item sub-item" active-class="active">
-              <i class="fas fa-box"></i>
-              <span v-if="!sidebarCollapsed">Imported Products</span>
-            </router-link>
-            <router-link to="/ecommerce/orders_table" class="nav-item sub-item" active-class="active">
-              <i class="fas fa-clipboard-list"></i>
-              <span v-if="!sidebarCollapsed">Orders</span>
-            </router-link>
-            <router-link to="/ecommerce/config" class="nav-item sub-item" active-class="active">
-              <i class="fas fa-cog"></i>
-              <span v-if="!sidebarCollapsed">Configuration</span>
-            </router-link>
-            <router-link to="/ecommerce/logs" class="nav-item sub-item" active-class="active">
-              <i class="fas fa-history"></i>
-              <span v-if="!sidebarCollapsed">Logs</span>
-            </router-link>
-          </div>
-        </div>
-        
-        <router-link to="/preforma/products" class="nav-item" active-class="active">
-          <i class="fas fa-file-invoice"></i>
-          <span v-if="!sidebarCollapsed">Preforma Invoice</span>
-        </router-link>
-        
-        <router-link to="/fio/fio_table" class="nav-item" active-class="active">
-          <i class="fas fa-university"></i>
-          <span v-if="!sidebarCollapsed">Fio Transactions</span>
-        </router-link>
-      </nav>
-
-      <div class="sidebar-footer">
-        <button class="logout-button" @click="logout">
-          <i class="fas fa-sign-out-alt"></i>
-          <span v-if="!sidebarCollapsed">Logout</span>
-        </button>
-      </div>
-    </aside>
+  
 
     <!-- Main Content -->
     <main class="main-content">
@@ -124,13 +55,20 @@
       </div>
     </aside>
   </div>
+  </AppLayout>
 </template>
 
-<script setup>
+<script>
+import AppLayout from './AppLayout.vue';
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useUIStore } from '../stores/ui';
 
+export default {
+  components: {
+    AppLayout
+  }
+}
 const router = useRouter();
 const route = useRoute();
 const uiStore = useUIStore();
@@ -141,7 +79,6 @@ const ecommerceMenuOpen = ref(true);
 const recentSites = ref([
   { name: 'E-commerce Products', path: '/ecommerce/products/products_table' },
   { name: 'Orders', path: '/ecommerce/orders_table' },
-  { name: 'Preforma Invoice', path: '/preforma/products' },
   { name: 'Fio Transactions', path: '/fio/fio_table' }
 ]);
 
@@ -153,7 +90,6 @@ const pageTitle = computed(() => {
   if (path.includes('orders_table')) return 'Orders';
   if (path.includes('config')) return 'Configuration';
   if (path.includes('logs')) return 'Logs';
-  if (path.includes('preforma')) return 'Preforma Invoice';
   if (path.includes('fio_table')) return 'Fio Transactions';
   return 'Dashboard';
 });

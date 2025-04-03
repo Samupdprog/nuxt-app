@@ -266,7 +266,6 @@
 
 <script>
 import { DxDataGrid, DxColumn, DxPaging, DxPager, DxFilterRow, DxHeaderFilter, DxSearchPanel, DxColumnChooser, DxSelection } from 'devextreme-vue/data-grid';
-import AppLayout from '~/layouts/AppLayout.vue';
 
 export default {
   components: {
@@ -279,7 +278,6 @@ export default {
     DxSearchPanel,
     DxColumnChooser,
     DxSelection,
-    AppLayout
   },
   data() {
     return {

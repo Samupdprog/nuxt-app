@@ -22,5 +22,11 @@
     "vue-router": "^4.5.0",
     "vuetify": "^3.7.16",
     "@nuxtjs/tailwindcss": "npm:@nuxtjs/tailwindcss@nightly"
-  }
+  },
+  "scripts": {
+  "dev": "nuxt dev",
+  "build": "nuxt build",
+  "start": "node .output/server/index.mjs"
+}
+
 }

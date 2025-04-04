@@ -2,7 +2,7 @@
   <v-container>
     <v-card>
       <v-card-title class="d-flex align-center">
-        <span>FIO Error Logs</span>
+        <span>Orders Error Logs</span>
         <v-spacer></v-spacer>
         <v-btn
           color="error"
@@ -16,7 +16,7 @@
       </v-card-title>
       
       <v-card-subtitle>
-        Errors found in FIO transaction processing
+        Errors found in Orders transaction processing
       </v-card-subtitle>
       
       <v-card-text>
@@ -50,7 +50,7 @@
         <div v-else-if="errors.length === 0" class="text-center my-6">
           <v-icon size="64" color="success">mdi-check-circle</v-icon>
           <div class="text-h6 mt-2">No errors found</div>
-          <div class="text-body-2 text-grey">All FIO transactions are processing correctly</div>
+          <div class="text-body-2 text-grey">All Orders are importing correctly</div>
         </div>
         
         <v-data-table
@@ -198,7 +198,7 @@ async function fetchErrors() {
   apiError.value = '';
   
   try {
-    const response = await fetch('http://35.180.124.4:1880/fio-errors');
+    const response = await fetch('http://35.180.124.4:1880/order-errors');
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
@@ -209,7 +209,7 @@ async function fetchErrors() {
     // Process the data
     if (Array.isArray(data)) {
       errors.value = data.map(error => {
-        // Extract transactionId from details if available
+        // Extraer transactionId si está disponible en details
         const transactionId = error.details?.transactionId || 
                              error.details?.transaction?.idFio || 
                              error.details?.transaction?.transactionId || 
@@ -263,7 +263,7 @@ async function deleteAllErrors() {
   apiError.value = '';
   
   try {
-    const response = await fetch('http://35.180.124.4:1880/delete-fio-errors');
+    const response = await fetch('http://35.180.124.4:1880/delete-order-errors');
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);

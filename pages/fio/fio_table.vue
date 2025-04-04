@@ -1,5 +1,4 @@
-```vue type="vue" project="FIO Transaction Manager" file="fio_table.vue"
-[v0-no-op-code-block-prefix]<template>
+<template>
   <AppLayout>
     <div class="fio-dashboard">
       <!-- Loading overlay -->
@@ -30,36 +29,29 @@
         <div v-if="showControlPanel" class="controls-panel">
           <div class="controls-left">
             <!-- Execute 1 day button -->
-            <button @click="fetchOneDay" class="btn btn-primary">
+            <button @click="fetchFirstDay" class="btn btn-primary">
               <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                 <line x1="16" y1="2" x2="16" y2="6"></line>
                 <line x1="8" y1="2" x2="8" y2="6"></line>
                 <line x1="3" y1="10" x2="21" y2="10"></line>
               </svg>
-              Execute 1 day
+              Reset & Load Data
             </button>
             
             <!-- Custom days input -->
             <div class="custom-days">
-              <span>Execute</span>
+              <span>Max days</span>
               <input 
                 type="number" 
-                v-model="customDays" 
+                v-model="maxDays" 
                 min="1" 
                 max="90" 
                 placeholder="days" 
                 class="input-number"
-                aria-label="Number of days"
+                aria-label="Maximum number of days"
               />
               <span>days</span>
-              <button @click="fetchCustomDays" class="btn btn-outline">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-                  <polyline points="16 7 22 7 22 13"></polyline>
-                </svg>
-                Execute
-              </button>
             </div>
           </div>
           
@@ -67,6 +59,15 @@
             Last update: {{ lastUpdated }}
           </div>
         </div>
+      </div>
+      
+      <!-- Debug info -->
+      <div v-if="debug" class="debug-info">
+        <p>Current Day: {{ currentDay }}</p>
+        <p>Loading: {{ isLoading }}</p>
+        <p>Loading More: {{ loadingMore }}</p>
+        <p>All Data Loaded: {{ allDataLoaded }}</p>
+        <p>Transactions Count: {{ transactions.length }}</p>
       </div>
       
       <!-- Import Summary Section -->
@@ -92,23 +93,23 @@
             </div>
             <div class="summary-item">
               <span class="summary-label">Date Range:</span>
-              <span class="summary-value">{{ formatDate(importSummary.dateRange.from) }} - {{ formatDate(importSummary.dateRange.to) }}</span>
+              <span class="summary-value">{{ formatDate(importSummary.dateRange?.from) }} - {{ formatDate(importSummary.dateRange?.to) }}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Successful Transactions:</span>
-              <span class="summary-value success">{{ importSummary.transactions.successful }}</span>
+              <span class="summary-value success">{{ importSummary.transactions?.successful }}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Failed Transactions:</span>
-              <span class="summary-value error">{{ importSummary.transactions.failed }}</span>
+              <span class="summary-value error">{{ importSummary.transactions?.failed }}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Duplicate Transactions:</span>
-              <span class="summary-value warning">{{ importSummary.transactions.duplicates }}</span>
+              <span class="summary-value warning">{{ importSummary.transactions?.duplicates }}</span>
             </div>
             <div class="summary-item">
               <span class="summary-label">Total Transactions:</span>
-              <span class="summary-value">{{ importSummary.transactions.total }}</span>
+              <span class="summary-value">{{ importSummary.transactions?.total }}</span>
             </div>
           </div>
         </div>
@@ -154,7 +155,7 @@
       </div>
 
       <!-- DataGrid -->
-      <div class="data-grid-container">
+      <div class="data-grid-container" ref="gridContainer">
         <DxDataGrid
           :data-source="transactions"
           :show-borders="true"
@@ -208,9 +209,17 @@
           <DxSearchPanel :visible="true" :highlight-case-sensitive="false" />
           <DxColumnChooser :enabled="true" />
           <DxSelection mode="multiple" />
-          <DxPaging :page-size="100" />
-          <DxPager :show-page-size-selector="true" :allowed-page-sizes="[10, 20, 50, 100]" />
         </DxDataGrid>
+      </div>
+      
+      <!-- Infinite scroll loading indicator -->
+      <div v-if="loadingMore" class="lazy-load-indicator">
+        <div class="loading-spinner-small"></div>
+        <span>Loading more transactions...</span>
+      </div>
+
+      <div v-if="allDataLoaded && transactions.length > 0" class="all-data-loaded">
+        <span>All transactions loaded</span>
       </div>
     </div>
   </AppLayout>
@@ -220,8 +229,6 @@
 import {
   DxDataGrid,
   DxColumn,
-  DxPaging,
-  DxPager,
   DxFilterRow,
   DxHeaderFilter,
   DxSearchPanel,
@@ -233,8 +240,6 @@ export default {
   components: {
     DxDataGrid,
     DxColumn,
-    DxPaging,
-    DxPager,
     DxFilterRow,
     DxHeaderFilter,
     DxSearchPanel,
@@ -247,14 +252,19 @@ export default {
       importSummary: null,
       accountInfo: null,
       lastUpdated: "",
-      customDays: 1, // Default to 1 day
+      maxDays: 3, // Maximum days to fetch (default 3 as per requirements)
       isLoading: false,
       errorMessage: "",
       apiUrl: "http://35.180.124.4:1880", // Base API URL
       showControlPanel: true, // Control panel visibility
       showImportSummary: true, // Import summary visibility
       showAccountInfo: true, // Account info visibility
-      detailedTransactions: null // Store detailed transactions for status determination
+      detailedTransactions: null, // Store detailed transactions for status determination
+      currentDay: 0, // Current day being fetched (0 means no data fetched yet)
+      loadingMore: false, // Flag to indicate if more data is being loaded
+      allDataLoaded: false, // Flag to indicate if all data has been loaded
+      observer: null, // Intersection observer for infinite scrolling
+      debug: true, // Enable debug info
     };
   },
   methods: {
@@ -281,7 +291,7 @@ export default {
       return value || '';
     },
     
-    // Row click handler - now redirects to transaction details page
+    // Row click handler - redirects to transaction details page
     onRowClick(e) {
       // Store transaction data in localStorage to access it on the details page
       localStorage.setItem('selectedTransaction', JSON.stringify(e.data));
@@ -331,58 +341,59 @@ export default {
       return date.toLocaleDateString();
     },
     
-    // Fetch one day of transactions
-    fetchOneDay() {
-      try {
-        this.isLoading = true;
-        this.errorMessage = "";
-        
-        const endpoint = `${this.apiUrl}/import-fio-days/1`;
-        
-        fetch(endpoint)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`API error: ${response.status} ${response.statusText}`);
-            }
-            return response.json();
-          })
-          .then(data => {
-            console.log("API Response structure:", Object.keys(data)); // Log the keys in the response
-            console.log("API Response:", data); // Log the full response
-            this.processApiResponse(data);
-          })
-          .catch(error => {
-            console.error("Error fetching transactions:", error);
-            this.errorMessage = `Error: ${error.message}`;
-            
-            // For demo purposes, use sample data if API fails
-            this.processSampleData();
-          })
-          .finally(() => {
-            this.isLoading = false;
-            this.updateLastUpdatedTime();
-          });
-      } catch (error) {
-        console.error("Error in fetchOneDay:", error);
-        this.errorMessage = `Error: ${error.message}`;
-        this.isLoading = false;
-      }
+    // Reset and start fetching data from day 1
+    fetchFirstDay() {
+      console.log("Resetting and fetching first day data");
+      this.transactions = [];
+      this.currentDay = 0;
+      this.allDataLoaded = false;
+      this.isLoading = false; // Reset loading state
+      this.loadingMore = false; // Reset loading more state
+      this.loadNextDay();
     },
     
-    // Fetch custom number of days
-    async fetchCustomDays() {
-      // Validate input
-      const days = parseInt(this.customDays);
-      if (isNaN(days) || days < 1 || days > 90) {
-        this.errorMessage = "Please enter a number between 1 and 90";
+    // Función para crear un retraso (delay) usando Promise
+    delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
+    // Load the next day of data
+    async loadNextDay() {
+      if (this.loadingMore || this.allDataLoaded) {
+        console.log("Skipping loadNextDay - already loading or all data loaded");
         return;
       }
       
-      try {
+      // Increment the current day
+      this.currentDay++;
+      console.log(`Starting to load data for day ${this.currentDay}`);
+      
+      // Check if we've reached the maximum days
+      if (this.currentDay > this.maxDays) {
+        console.log(`Reached maximum days (${this.maxDays}), marking all data as loaded`);
+        this.allDataLoaded = true;
+        return;
+      }
+      
+      // Set loading state
+      if (this.currentDay === 1) {
+        console.log("Setting isLoading to true for first day");
         this.isLoading = true;
-        this.errorMessage = "";
+      } else {
+        console.log("Setting loadingMore to true for subsequent days");
+        this.loadingMore = true;
+      }
+      
+      try {
+        console.log(`Waiting 1 second before fetching data for day ${this.currentDay}`);
+        // Esperar 1 segundo antes de hacer la petición
+        await this.delay(1000);
         
-        const endpoint = `${this.apiUrl}/import-fio-days/${days}`;
+        console.log(`Fetching data for day ${this.currentDay}`);
+        
+        // Fetch data for the current day
+        const endpoint = `${this.apiUrl}/import-fio-days/${this.currentDay}`;
+        console.log(`API endpoint: ${endpoint}`);
         
         const response = await fetch(endpoint);
         
@@ -391,147 +402,176 @@ export default {
         }
         
         const data = await response.json();
-        console.log("API Response:", data); // Log the response for debugging
-        this.processApiResponse(data);
+        console.log(`Received data for day ${this.currentDay}. Response structure:`, Object.keys(data));
         
-      } catch (error) {
-        console.error("Error fetching transactions:", error);
-        this.errorMessage = `Error: ${error.message}`;
-        
-        // For demo purposes, use sample data if API fails
-        this.processSampleData();
-      } finally {
-        this.isLoading = false;
-        this.updateLastUpdatedTime();
-      }
-    },
-    
-    // Process API response based on the JSON structure
-    processApiResponse(data) {
-      try {
-        console.log("Processing API response:", data); // Log the full response for debugging
-        
-        // Process import summary
-        if (data.importSummary) {
-          this.importSummary = data.importSummary;
-        }
-        
-        // Process account info
-        if (data.accountInfo) {
-          this.accountInfo = data.accountInfo;
+        // Process import summary and account info only for the first day
+        if (this.currentDay === 1) {
+          if (data.importSummary) {
+            console.log("Setting import summary", data.importSummary);
+            this.importSummary = data.importSummary;
+          }
+          
+          if (data.accountInfo) {
+            console.log("Setting account info", data.accountInfo);
+            this.accountInfo = data.accountInfo;
+          }
         }
         
         // Store detailed transactions for status determination
         if (data.detailedTransactions) {
+          console.log("Setting detailed transactions", data.detailedTransactions);
           this.detailedTransactions = data.detailedTransactions;
         }
         
-        // Check for transactions in different possible locations in the API response
-        let transactionsData = null;
+        // Extract transactions from the response
+        const transactionsData = this.extractTransactionsFromResponse(data);
         
-        // 1. PRIMERO: Buscar en data.detailedTransactions.allTransactions
-        if (
-          data.detailedTransactions && 
-          data.detailedTransactions.allTransactions && 
-          Array.isArray(data.detailedTransactions.allTransactions) && 
-          data.detailedTransactions.allTransactions.length > 0
-        ) {
-          console.log("Found transactions in data.detailedTransactions.allTransactions");
-          transactionsData = data.detailedTransactions.allTransactions;
-        } 
-        // 2. SEGUNDO: Buscar en data.allTransactions (como antes)
-        else if (data.allTransactions && Array.isArray(data.allTransactions) && data.allTransactions.length > 0) {
-          console.log("Found transactions in data.allTransactions");
-          transactionsData = data.allTransactions;
-        } 
-        // 3. TERCERO: Buscar en data.transactions (como antes)
-        else if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
-          console.log("Found transactions in data.transactions");
-          transactionsData = data.transactions;
-        } 
-        // 4. ÚLTIMO RECURSO: Reconstruir desde successful, failed, duplicates (solo si no hay otra opción)
-        else if (data.detailedTransactions && 
-                (data.detailedTransactions.successful || 
-                 data.detailedTransactions.failed || 
-                 data.detailedTransactions.duplicates)) {
-          console.log("Reconstructing transactions from successful/failed/duplicates lists");
-          // Si tenemos detailed transactions pero no allTransactions, reconstruir desde detailed
-          const allTransactions = [];
+        if (transactionsData && transactionsData.length > 0) {
+          console.log(`Found ${transactionsData.length} transactions for day ${this.currentDay}`);
           
-          // Add successful transactions
-          if (Array.isArray(data.detailedTransactions.successful)) {
-            data.detailedTransactions.successful.forEach(tx => {
-              if (tx.idFio) {
-                allTransactions.push({
-                  idFio: tx.idFio,
-                  statementNumber: tx.statementNumber,
-                  imported: true
-                });
-              }
-            });
-          }
+          // Map transactions to the format expected by the DataGrid
+          const newTransactions = this.mapTransactionsToDataGrid(transactionsData);
           
-          // Add failed transactions
-          if (Array.isArray(data.detailedTransactions.failed)) {
-            data.detailedTransactions.failed.forEach(tx => {
-              if (tx.idFio) {
-                allTransactions.push({
-                  idFio: tx.idFio,
-                  statementNumber: tx.statementNumber,
-                  imported: false
-                });
-              }
-            });
-          }
+          // Append new transactions to existing ones
+          this.transactions = [...this.transactions, ...newTransactions];
+          console.log(`Total transactions after adding day ${this.currentDay}: ${this.transactions.length}`);
           
-          // Add duplicate transactions
-          if (Array.isArray(data.detailedTransactions.duplicates)) {
-            data.detailedTransactions.duplicates.forEach(tx => {
-              if (tx.idFio) {
-                allTransactions.push({
-                  idFio: tx.idFio,
-                  statementNumber: tx.statementNumber,
-                  imported: false
-                });
-              }
-            });
-          }
-          
-          if (allTransactions.length > 0) {
-            transactionsData = allTransactions;
-          }
+          // Update last updated time
+          this.updateLastUpdatedTime();
         } else {
-          // Check if transactions might be in the root of the response
-          const possibleTransactions = Object.values(data).find(
-            value => Array.isArray(value) && value.length > 0 && value[0] && (value[0].idFio || value[0].transactionId)
-          );
-          
-          if (possibleTransactions) {
-            console.log("Found transactions in root of response");
-            transactionsData = possibleTransactions;
-          } else {
-            throw new Error("No transactions found in API response");
-          }
+          console.log(`No transactions found for day ${this.currentDay}`);
         }
         
-        // Process transactions if we found them
-        if (transactionsData && transactionsData.length > 0) {
-          console.log(`Processing ${transactionsData.length} transactions`);
-          this.mapTransactions(transactionsData);
-        } else {
-          throw new Error("No transactions found in API response");
+        // If we've reached the maximum days, mark as all data loaded
+        if (this.currentDay >= this.maxDays) {
+          console.log(`Reached maximum days (${this.maxDays}), marking all data as loaded`);
+          this.allDataLoaded = true;
         }
       } catch (error) {
-        console.error("Error processing API response:", error);
-        this.errorMessage = `Error processing API response: ${error.message}`;
+        console.error(`Error fetching transactions for day ${this.currentDay}:`, error);
+        this.errorMessage = `Error loading data: ${error.message}`;
+      } finally {
+        // Reset loading states
+        if (this.currentDay === 1) {
+          console.log("Setting isLoading to false for first day");
+          this.isLoading = false;
+        } else {
+          console.log("Setting loadingMore to false for subsequent days");
+          this.loadingMore = false;
+        }
       }
     },
-    
-    // Map transactions to DataGrid format with improved status determination
-    mapTransactions(transactions) {
-      console.log("Mapping transactions:", transactions); // Log the transactions being mapped
+
+    // Extract transactions from the API response
+    extractTransactionsFromResponse(data) {
+      console.log("Extracting transactions from response. Available keys:", Object.keys(data));
       
-      this.transactions = transactions.map(tx => {
+      // 0. Verificar en data.transactionDetails (nuevo)
+      if (
+        data.transactionDetails &&
+        Array.isArray(data.transactionDetails) &&
+        data.transactionDetails.length > 0
+      ) {
+        console.log(`Found ${data.transactionDetails.length} transactions in data.transactionDetails`);
+        return data.transactionDetails;
+      }
+
+      // 1. Check in data.detailedTransactions.allTransactions
+      if (
+        data.detailedTransactions && 
+        data.detailedTransactions.allTransactions && 
+        Array.isArray(data.detailedTransactions.allTransactions) && 
+        data.detailedTransactions.allTransactions.length > 0
+      ) {
+        console.log("Found transactions in data.detailedTransactions.allTransactions");
+        return data.detailedTransactions.allTransactions;
+      } 
+      // 2. Check in data.allTransactions
+      else if (data.allTransactions && Array.isArray(data.allTransactions) && data.allTransactions.length > 0) {
+        console.log("Found transactions in data.allTransactions");
+        return data.allTransactions;
+      } 
+      // 3. Check in data.transactions
+      else if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
+        console.log("Found transactions in data.transactions");
+        return data.transactions;
+      } 
+      // 4. Reconstruct from successful, failed, duplicates
+      else if (data.detailedTransactions && 
+              (data.detailedTransactions.successful || 
+               data.detailedTransactions.failed || 
+               data.detailedTransactions.duplicates)) {
+        console.log("Reconstructing transactions from successful/failed/duplicates lists");
+        const allTransactions = [];
+        
+        // Add successful transactions
+        if (Array.isArray(data.detailedTransactions.successful)) {
+          data.detailedTransactions.successful.forEach(tx => {
+            if (tx.idFio) {
+              allTransactions.push({
+                idFio: tx.idFio,
+                statementNumber: tx.statementNumber,
+                imported: true
+              });
+            }
+          });
+        }
+        
+        // Add failed transactions
+        if (Array.isArray(data.detailedTransactions.failed)) {
+          data.detailedTransactions.failed.forEach(tx => {
+            if (tx.idFio) {
+              allTransactions.push({
+                idFio: tx.idFio,
+                statementNumber: tx.statementNumber,
+                imported: false
+              });
+            }
+          });
+        }
+        
+        // Add duplicate transactions
+        if (Array.isArray(data.detailedTransactions.duplicates)) {
+          data.detailedTransactions.duplicates.forEach(tx => {
+            if (tx.idFio) {
+              allTransactions.push({
+                idFio: tx.idFio,
+                statementNumber: tx.statementNumber,
+                imported: false
+              });
+            }
+          });
+        }
+        
+        if (allTransactions.length > 0) {
+          return allTransactions;
+        }
+      } 
+      // 5. Check if transactions might be in the root of the response
+      else {
+        console.log("Searching for transactions in the root of the response");
+        // Log all keys in the response to help debug
+        console.log("Response keys:", Object.keys(data));
+        
+        const possibleTransactions = Object.values(data).find(
+          value => Array.isArray(value) && value.length > 0 && value[0] && (value[0].idFio || value[0].transactionId)
+        );
+        
+        if (possibleTransactions) {
+          console.log("Found transactions in root of response");
+          return possibleTransactions;
+        }
+      }
+      
+      console.log("No transactions found in the response");
+      return null;
+    },
+
+    // Map transactions to DataGrid format
+    mapTransactionsToDataGrid(transactions) {
+      console.log("Mapping transactions to DataGrid format. Sample transaction:", transactions[0]);
+      
+      return transactions.map(tx => {
         // Determine status based on transaction properties and detailedTransactions
         let status = 'unknown';
         
@@ -559,100 +599,59 @@ export default {
         }
         
         // Create a transaction object with all possible fields
+        // Verificar todos los posibles nombres de campos
         return {
-          id: tx.idFio || tx.transactionId || '',
-          date: tx.transactionDate || '',
+          id: tx.idFio || tx.transactionId || tx.id || '',
+          date: tx.transactionDate || tx.date || '',
           amount: tx.amount || '',
           currency: tx.currency || '',
-          counterAccount: tx.counterAccount || '',
-          counterName: tx.counterAccountName || '',
+          counterAccount: tx.counterAccount || tx.counterPartyAccount || '',
+          counterName: tx.counterAccountName || tx.counterPartyName || '',
           bankCode: tx.bankCode || '',
           bankName: tx.bankName || '',
-          constantSymbol: tx.constantSymbol || '',
-          variableSymbol: tx.variableSymbol || '',
-          specificSymbol: tx.specificSymbol || '',
-          userId: tx.userIdentification || '',
-          message: tx.messageForRecipient || '',
-          type: tx.transactionType || '',
-          comment: tx.comment || '',
-          paymentOrderId: tx.instructionId || '',
+          constantSymbol: tx.constantSymbol || tx.ks || '',
+          variableSymbol: tx.variableSymbol || tx.vs || '',
+          specificSymbol: tx.specificSymbol || tx.ss || '',
+          userId: tx.userIdentification || tx.userId || '',
+          message: tx.messageForRecipient || tx.message || '',
+          type: tx.transactionType || tx.type || '',
+          comment: tx.comment || tx.note || '',
+          paymentOrderId: tx.instructionId || tx.paymentOrderId || '',
           status: status,
-          executor: tx.executedBy || '',
-          // Store the raw data for details view
+          executor: tx.executedBy || tx.executor || '',
           raw: tx.raw || null
         };
       });
-      
-      console.log("Mapped transactions:", this.transactions); // Log the final mapped transactions
     },
     
-    // Process sample data for testing
-    processSampleData() {
-      const sampleData = {
-        importSummary: {
-          timestamp: "2025-04-03T13:37:28.914Z",
-          daysBack: 3,
-          dateRange: {
-            from: "2025-03-31",
-            to: "2025-04-03"
-          },
-          transactions: {
-            successful: 661,
-            failed: 0,
-            duplicates: 0,
-            total: 661
-          }
-        },
-        detailedTransactions: {
-          successful: [
-            {
-              idFio: "26983196160",
-              statementNumber: "090/001"
-            }
-          ],
-          failed: [],
-          duplicates: []
-        },
-        allTransactions: [
-          {
-            transactionDate: "2025-03-31",
-            amount: "2269.83",
-            counterAccount: "2533960302",
-            bankCode: "2600",
-            constantSymbol: "0000",
-            variableSymbol: "0",
-            specificSymbol: "0",
-            userIdentification: "STRIPE TECHNOLOGY EU",
-            transactionType: "Bezhotovostní příjem",
-            counterAccountName: "STRIPE TECHNOLOGY EU",
-            bankName: "Citibank Europe plc, organizační složka",
-            currency: "CZK",
-            messageForRecipient: "STRIPE",
-            instructionId: "37557625586",
-            transactionId: "26983196160",
-            diaStatement: "090",
-            idFio: "26983196160",
-            statementNumber: "090/001",
-            imported: true
-          }
-        ],
-        accountInfo: {
-          accountId: ["2101909941"],
-          bankId: ["2010"],
-          currency: ["CZK"],
-          iban: ["CZ2320100000002101909941"],
-          bic: ["FIOBCZPPXXX"],
-          openingBalance: ["42.17"],
-          closingBalance: ["1989.02"],
-          dateStart: ["2025-03-31+02:00"],
-          dateEnd: ["2025-04-03+02:00"],
-          idFrom: ["26983196160"],
-          idTo: ["26993105740"]
-        }
-      };
+    // Set up intersection observer for infinite scrolling
+    setupIntersectionObserver() {
+      // Disconnect any existing observer
+      if (this.observer) {
+        this.observer.disconnect();
+      }
       
-      // Process the sample data
-      this.processApiResponse(sampleData);
+      // Create a new intersection observer
+      this.observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && !this.loadingMore && !this.allDataLoaded) {
+            console.log("Intersection observer triggered, loading next day");
+            this.loadNextDay();
+          }
+        });
+      }, {
+        root: null, // Use the viewport
+        rootMargin: '100px', // Load more when within 100px of the bottom
+        threshold: 0.1 // Trigger when 10% of the target is visible
+      });
+      
+      // Observe the grid container
+      if (this.$refs.gridContainer) {
+        this.observer.observe(this.$refs.gridContainer);
+        console.log('Intersection observer set up');
+      } else {
+        console.warn('No grid container found for intersection observer');
+      }
     },
     
     // Update last updated time
@@ -663,11 +662,45 @@ export default {
         minute: "2-digit",
         second: "2-digit"
       });
+    },
+    
+    // Additional method for scroll event handling (fallback for intersection observer)
+    handleScroll() {
+      if (this.loadingMore || this.allDataLoaded) return;
+      
+      const scrollPosition = window.innerHeight + window.scrollY;
+      const documentHeight = document.documentElement.offsetHeight;
+      
+      // Load more data when user scrolls to the bottom of the page
+      if (scrollPosition >= documentHeight - 200) {
+        console.log("Scroll event triggered, loading next day");
+        this.loadNextDay();
+      }
     }
   },
   mounted() {
-    // Load initial data (1 day)
-    this.fetchOneDay();
+    console.log("Component mounted");
+    // Start loading data
+    this.fetchFirstDay();
+    
+    // Set up the intersection observer for infinite scrolling
+    this.$nextTick(() => {
+      this.setupIntersectionObserver();
+    });
+    
+    // Add scroll event listener as a fallback for intersection observer
+    window.addEventListener('scroll', this.handleScroll);
+  },
+  
+  beforeDestroy() {
+    console.log("Component being destroyed");
+    // Clean up
+    if (this.observer) {
+      this.observer.disconnect();
+    }
+    
+    // Remove scroll event listener
+    window.removeEventListener('scroll', this.handleScroll);
   }
 };
 </script>
@@ -677,7 +710,7 @@ export default {
   --primary-color: #3b82f6;
   --primary-hover: #2563eb;
   --success-color: #10b981;
-  --warning-color: #10b981; /* Changed to green as requested */
+  --warning-color: #10b981; /* Green color as requested */
   --error-color: #ef4444;
   --already-imported-color: #3b82f6; /* Blue color for already imported status */
   --text-color: #1f2937;
@@ -685,6 +718,21 @@ export default {
   --border-color: #e5e7eb;
   --bg-light: #f9fafb;
   --bg-white: #ffffff;
+}
+
+/* Debug info */
+.debug-info {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.debug-info p {
+  margin: 5px 0;
 }
 
 /* General styles */
@@ -971,11 +1019,13 @@ export default {
   flex: 1;
   overflow: hidden;
   position: relative;
+  min-height: 400px; /* Asegurar una altura mínima */
+  height: 600px; /* Altura fija para pruebas */
 }
 
 /* Loading indicator */
 .loading-container {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
@@ -984,10 +1034,8 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg-white);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  z-index: 10;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 1000;
 }
 
 .loading-spinner {
@@ -1050,16 +1098,6 @@ export default {
 
 :deep(.dx-datagrid-rowsview .dx-row:hover) {
   background-color: var(--bg-light);
-}
-
-:deep(.dx-datagrid-pager) {
-  padding: 12px;
-  background-color: var(--bg-white);
-  border-top: 1px solid var(--border-color);
-}
-
-:deep(.dx-button) {
-  border-radius: 6px;
 }
 
 /* Status indicators */
@@ -1133,6 +1171,41 @@ export default {
   font-size: 18px;
   cursor: pointer;
   margin-left: 10px;
+}
+
+/* Lazy loading indicator */
+.lazy-load-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: var(--bg-light);
+  border-radius: 0 0 8px 8px;
+  border-top: 1px solid var(--border-color);
+  font-size: 14px;
+  color: var(--text-light);
+  gap: 10px;
+}
+
+.loading-spinner-small {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--bg-light);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s linear infinite;
+}
+
+.all-data-loaded {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: var(--bg-light);
+  border-radius: 0 0 8px 8px;
+  border-top: 1px solid var(--border-color);
+  font-size: 14px;
+  color: var(--text-light);
 }
 
 /* Responsive */

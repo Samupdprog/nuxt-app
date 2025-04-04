@@ -74,15 +74,31 @@
           </div>
         </div>
 
-
-
-        <NuxtLink to="/fio/fio_table" class="nav-item" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-            <line x1="2" y1="10" x2="22" y2="10"></line>
-          </svg>
-          <span v-if="!sidebarCollapsed">Fio Transactions</span>
-        </NuxtLink>
+        <div class="nav-group">
+          <div class="nav-group-header" @click="toggleFioMenu">
+            <div class="nav-item">
+              <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+              <span v-if="!sidebarCollapsed">Fio</span>
+            </div>
+            <svg v-if="!sidebarCollapsed" xmlns="http://www.w3.org/2000/svg" class="arrow-icon" :class="{ 'arrow-down': fioMenuOpen }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+          
+          <div class="nav-group-items" v-if="fioMenuOpen || sidebarCollapsed">
+            <NuxtLink to="/fio/fio_table" class="nav-subitem" active-class="active">
+              <span v-if="!sidebarCollapsed">Transactions</span>
+              <span v-else class="tooltip">Transactions</span>
+            </NuxtLink>
+            <NuxtLink to="/fio/logs" class="nav-subitem" active-class="active">
+              <span v-if="!sidebarCollapsed">Error Logs</span>
+              <span v-else class="tooltip">Error Logs</span>
+            </NuxtLink>
+          </div>
+        </div>
       </nav>
     </aside>
 
@@ -99,7 +115,8 @@ export default {
   data() {
     return {
       sidebarCollapsed: false,
-      ecommerceMenuOpen: true
+      ecommerceMenuOpen: true,
+      fioMenuOpen: true
     };
   },
   methods: {
@@ -111,6 +128,11 @@ export default {
     toggleEcommerceMenu() {
       if (!this.sidebarCollapsed) {
         this.ecommerceMenuOpen = !this.ecommerceMenuOpen;
+      }
+    },
+    toggleFioMenu() {
+      if (!this.sidebarCollapsed) {
+        this.fioMenuOpen = !this.fioMenuOpen;
       }
     }
   },
@@ -425,3 +447,4 @@ export default {
   }
 }
 </style>
+

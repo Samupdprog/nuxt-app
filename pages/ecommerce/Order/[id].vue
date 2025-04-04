@@ -169,42 +169,69 @@ export default {
     goBack() {
       this.$router.push('/ecommerce/orders_table');
     },
+    loadOrderFromSessionStorage() {
+      try {
+        // Intentar obtener el pedido de sessionStorage
+        const storedOrder = sessionStorage.getItem('currentOrder');
+        if (storedOrder) {
+          const parsedOrder = JSON.parse(storedOrder);
+          
+          // Verificar si este es el pedido que estamos buscando
+          if (parsedOrder.order_number === this.orderId) {
+            this.order = parsedOrder;
+            this.isLoading = false;
+            console.log("Pedido cargado desde sessionStorage:", this.order);
+            return true;
+          }
+        }
+        return false;
+      } catch (error) {
+        console.error("Error al cargar el pedido desde sessionStorage:", error);
+        return false;
+      }
+    },
     async fetchOrderDetails() {
+      // Primero intentar cargar desde sessionStorage
+      if (this.loadOrderFromSessionStorage()) {
+        return; // El pedido se cargó correctamente desde sessionStorage
+      }
+      
+      // Si no se encuentra en sessionStorage, obtener de la API
       this.isLoading = true;
       try {
-        // Fetch all orders and find the specific one
+        // Obtener todos los pedidos y encontrar el específico
         const response = await fetch("http://35.180.124.4:1880/import-orders");
         
-        // Get the raw text first
+        // Obtener el texto sin procesar primero
         const rawText = await response.text();
         
-        // Try to sanitize the JSON by replacing invalid control characters
+        // Intentar sanear el JSON reemplazando caracteres de control no válidos
         const sanitizedText = rawText
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-          .replace(/\\"/g, '\\"') // Fix escaped quotes
-          .replace(/\n/g, "\\n") // Properly escape newlines
-          .replace(/\r/g, "\\r") // Properly escape carriage returns
-          .replace(/\t/g, "\\t"); // Properly escape tabs
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Eliminar caracteres de control
+          .replace(/\\"/g, '\\"') // Arreglar comillas escapadas
+          .replace(/\n/g, "\\n") // Escapar correctamente saltos de línea
+          .replace(/\r/g, "\\r") // Escapar correctamente retornos de carro
+          .replace(/\t/g, "\\t"); // Escapar correctamente tabulaciones
         
-        // Parse the sanitized JSON
+        // Analizar el JSON saneado
         let data;
         try {
           data = JSON.parse(sanitizedText);
         } catch (parseError) {
-          console.error("JSON Parse Error:", parseError);
-          throw new Error("Invalid JSON response from server");
+          console.error("Error al analizar JSON:", parseError);
+          throw new Error("Respuesta JSON no válida del servidor");
         }
         
         if (data && data.processedOrders && Array.isArray(data.processedOrders)) {
-          // Find the order with matching ID
+          // Encontrar el pedido con ID coincidente
           const foundOrder = data.processedOrders.find(order => order.order_number === this.orderId);
           
           if (foundOrder) {
-            // Process the order data similar to the orders_table component
+            // Procesar los datos del pedido similar al componente orders_table
             let importStatus = "success"; 
             let importLog = "Successful Import";
 
-            // Process warnings and errors if they exist
+            // Procesar advertencias y errores si existen
             if (data.importResults) {
               const errors = data.importResults.errors && Array.isArray(data.importResults.errors)
                 ? data.importResults.errors
@@ -227,7 +254,7 @@ export default {
               }
             }
 
-            // Check proforma invoice status
+            // Verificar el estado de la factura proforma
             let proformaInvoiceStatus = 'Pending';
             
             if (foundOrder.invoice_number) {
@@ -243,7 +270,7 @@ export default {
               }
             }
 
-            // Process products and add image URLs
+            // Procesar productos y añadir URLs de imágenes
             const processedProducts = foundOrder.products && Array.isArray(foundOrder.products)
               ? foundOrder.products.map(product => ({
                   ...product,
@@ -260,22 +287,22 @@ export default {
               showLog: false
             };
           } else {
-            console.error("Order not found:", this.orderId);
+            console.error("Pedido no encontrado:", this.orderId);
             this.order = null;
           }
         } else {
-          console.error("Invalid data structure:", data);
+          console.error("Estructura de datos no válida:", data);
           this.$toast({
-            message: "Invalid data structure received from server",
+            message: "Estructura de datos no válida recibida del servidor",
             type: 'error',
             duration: 3000
           });
           this.order = null;
         }
       } catch (error) {
-        console.error("Error loading order details:", error);
+        console.error("Error al cargar los detalles del pedido:", error);
         this.$toast({
-          message: "Error loading order details: " + (error.message || "Unknown error"),
+          message: "Error al cargar los detalles del pedido: " + (error.message || "Error desconocido"),
           type: 'error',
           duration: 3000
         });
@@ -302,7 +329,7 @@ export default {
       return 'log-normal';
     },
     $toast(options) {
-      // Simple toast implementation
+      // Implementación simple de toast
       const toast = document.createElement('div');
       toast.className = `toast toast-${options.type || 'info'}`;
       toast.textContent = options.message;

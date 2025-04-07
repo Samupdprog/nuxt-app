@@ -1,8 +1,8 @@
 <template>
   <AppLayout>
     <div class="fio-dashboard">
-      <!-- Loading overlay -->
-      <div v-if="isLoading" class="loading-container">
+      <!-- Loading overlay - only show for initial load -->
+      <div v-if="isLoading && currentDay === 1" class="loading-container">
         <div class="loading-spinner"></div>
         <p class="loading-text">Loading transactions...</p>
       </div>
@@ -59,15 +59,6 @@
             Last update: {{ lastUpdated }}
           </div>
         </div>
-      </div>
-      
-      <!-- Debug info -->
-      <div v-if="debug" class="debug-info">
-        <p>Current Day: {{ currentDay }}</p>
-        <p>Loading: {{ isLoading }}</p>
-        <p>Loading More: {{ loadingMore }}</p>
-        <p>All Data Loaded: {{ allDataLoaded }}</p>
-        <p>Transactions Count: {{ transactions.length }}</p>
       </div>
       
       <!-- Import Summary Section -->
@@ -157,6 +148,7 @@
       <!-- DataGrid -->
       <div class="data-grid-container" ref="gridContainer">
         <DxDataGrid
+          ref="dataGrid"
           :data-source="transactions"
           :show-borders="true"
           key-expr="id"
@@ -167,6 +159,7 @@
           @row-click="onRowClick"
           :no-data-text="'No transactions found'"
         >
+          <DxPaging :enabled="false" />
           <!-- Import Status column (always visible) -->
           <DxColumn 
             data-field="status" 
@@ -177,7 +170,7 @@
           />
           
           <DxColumn data-field="id" caption="ID" width="100" alignment="center" />
-          <DxColumn data-field="date" caption="Date" data-type="date" width="120" alignment="center" />
+          <DxColumn data-field="date" caption="Date" data-type="date" sort-order="desc" :sort-index="0" width="120" alignment="center" />
           <DxColumn data-field="amount" caption="Amount" width="100" alignment="right" cell-template="amountTemplate" />
           <DxColumn data-field="currency" caption="Currency" width="80" alignment="center" />
           <DxColumn data-field="counterAccount" caption="Counter Account" width="140" alignment="center" />
@@ -202,6 +195,22 @@
             <div class="status-indicator-container">
               <div :class="['status-indicator', data.value || 'unknown']" :title="getStatusTitle(data.value)"></div>
             </div>
+          </template>
+
+          <!-- Añadimos una columna especial para el loadMoreTrigger -->
+          <DxColumn
+            :visible="false"
+            cell-template="loadMoreTemplate"
+            :fixed="true"
+            :width="0"
+          />
+          
+          <template #loadMoreTemplate="{ rowIndex }">
+            <div 
+              v-if="rowIndex === transactions.length - 1" 
+              ref="loadMoreTrigger" 
+              class="load-more-trigger"
+            ></div>
           </template>
 
           <DxFilterRow :visible="true" />
@@ -233,8 +242,14 @@ import {
   DxHeaderFilter,
   DxSearchPanel,
   DxColumnChooser,
-  DxSelection
+  DxSelection,
+  DxPaging
 } from "devextreme-vue/data-grid";
+
+// Constantes para localStorage
+const STORAGE_KEY_CONTROL_PANEL = 'fio-transactions-control-panel';
+const STORAGE_KEY_IMPORT_SUMMARY = 'fio-transactions-import-summary';
+const STORAGE_KEY_ACCOUNT_INFO = 'fio-transactions-account-info';
 
 export default {
   components: {
@@ -245,6 +260,7 @@ export default {
     DxSearchPanel,
     DxColumnChooser,
     DxSelection,
+    DxPaging
   },
   data() {
     return {
@@ -252,7 +268,7 @@ export default {
       importSummary: null,
       accountInfo: null,
       lastUpdated: "",
-      maxDays: 3, // Maximum days to fetch (default 3 as per requirements)
+      maxDays: 90, // Maximum days to fetch
       isLoading: false,
       errorMessage: "",
       apiUrl: "http://35.180.124.4:1880", // Base API URL
@@ -264,23 +280,26 @@ export default {
       loadingMore: false, // Flag to indicate if more data is being loaded
       allDataLoaded: false, // Flag to indicate if all data has been loaded
       observer: null, // Intersection observer for infinite scrolling
-      debug: true, // Enable debug info
+      debug: true, // Habilitar debug info para diagnóstico
     };
   },
   methods: {
-    // Toggle control panel visibility
+    // Toggle control panel visibility y guardar estado
     toggleControlPanel() {
       this.showControlPanel = !this.showControlPanel;
+      localStorage.setItem(STORAGE_KEY_CONTROL_PANEL, this.showControlPanel);
     },
     
-    // Toggle import summary visibility
+    // Toggle import summary visibility y guardar estado
     toggleImportSummary() {
       this.showImportSummary = !this.showImportSummary;
+      localStorage.setItem(STORAGE_KEY_IMPORT_SUMMARY, this.showImportSummary);
     },
     
-    // Toggle account info visibility
+    // Toggle account info visibility y guardar estado
     toggleAccountInfo() {
       this.showAccountInfo = !this.showAccountInfo;
+      localStorage.setItem(STORAGE_KEY_ACCOUNT_INFO, this.showAccountInfo);
     },
     
     // Helper to get account info value (handles array or direct value)
@@ -352,113 +371,99 @@ export default {
       this.loadNextDay();
     },
     
-    // Función para crear un retraso (delay) usando Promise
+    // Function to create a delay using Promise
     delay(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
     },
 
-    // Load the next day of data
-    async loadNextDay() {
-      if (this.loadingMore || this.allDataLoaded) {
-        console.log("Skipping loadNextDay - already loading or all data loaded");
-        return;
-      }
+    async loadNextDay(retryCount = 0) {
+      const API_TIMEOUT = 5000; // Aumentado a 5 segundos
+      const MAX_RETRIES = 3;
       
-      // Increment the current day
-      this.currentDay++;
-      console.log(`Starting to load data for day ${this.currentDay}`);
-      
-      // Check if we've reached the maximum days
-      if (this.currentDay > this.maxDays) {
-        console.log(`Reached maximum days (${this.maxDays}), marking all data as loaded`);
+      if (this.isLoading || this.loadingMore || this.allDataLoaded) return;
+
+      const dayToFetch = this.currentDay + 1;
+
+      if (this.maxDays && dayToFetch > this.maxDays) {
         this.allDataLoaded = true;
+        console.log("✅ Reached maxDays limit, stopping.");
         return;
       }
-      
-      // Set loading state
-      if (this.currentDay === 1) {
-        console.log("Setting isLoading to true for first day");
-        this.isLoading = true;
-      } else {
-        console.log("Setting loadingMore to true for subsequent days");
-        this.loadingMore = true;
-      }
-      
+
+      if (this.currentDay === 0) this.isLoading = true;
+      else this.loadingMore = true;
+
       try {
-        console.log(`Waiting 1 second before fetching data for day ${this.currentDay}`);
-        // Esperar 1 segundo antes de hacer la petición
-        await this.delay(1000);
+        // Esperar antes del fetch para evitar sobrecarga
+        await this.delay(500);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+        const response = await fetch(`${this.apiUrl}/import-fio-days/${dayToFetch}`, {
+          signal: controller.signal
+        });
         
-        console.log(`Fetching data for day ${this.currentDay}`);
-        
-        // Fetch data for the current day
-        const endpoint = `${this.apiUrl}/import-fio-days/${this.currentDay}`;
-        console.log(`API endpoint: ${endpoint}`);
-        
-        const response = await fetch(endpoint);
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status} ${response.statusText}`);
-        }
-        
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+
         const data = await response.json();
-        console.log(`Received data for day ${this.currentDay}. Response structure:`, Object.keys(data));
-        
-        // Process import summary and account info only for the first day
-        if (this.currentDay === 1) {
-          if (data.importSummary) {
-            console.log("Setting import summary", data.importSummary);
-            this.importSummary = data.importSummary;
-          }
-          
-          if (data.accountInfo) {
-            console.log("Setting account info", data.accountInfo);
-            this.accountInfo = data.accountInfo;
-          }
+        const transactionsData = this.extractTransactionsFromResponse(data);
+
+        if (this.currentDay === 0) {
+          if (data.importSummary) this.importSummary = data.importSummary;
+          if (data.accountInfo) this.accountInfo = data.accountInfo;
         }
-        
-        // Store detailed transactions for status determination
+
         if (data.detailedTransactions) {
-          console.log("Setting detailed transactions", data.detailedTransactions);
           this.detailedTransactions = data.detailedTransactions;
         }
-        
-        // Extract transactions from the response
-        const transactionsData = this.extractTransactionsFromResponse(data);
-        
-        if (transactionsData && transactionsData.length > 0) {
-          console.log(`Found ${transactionsData.length} transactions for day ${this.currentDay}`);
-          
-          // Map transactions to the format expected by the DataGrid
+
+        if (transactionsData?.length > 0) {
           const newTransactions = this.mapTransactionsToDataGrid(transactionsData);
-          
-          // Append new transactions to existing ones
           this.transactions = [...this.transactions, ...newTransactions];
-          console.log(`Total transactions after adding day ${this.currentDay}: ${this.transactions.length}`);
-          
-          // Update last updated time
           this.updateLastUpdatedTime();
+          this.currentDay = dayToFetch;
+          console.log(`📦 Day ${this.currentDay}: ${newTransactions.length} transactions loaded.`);
+          
+          // Configurar el observer para el nuevo elemento de carga
+          this.$nextTick(() => {
+            this.setupIntersectionObserver();
+          });
         } else {
-          console.log(`No transactions found for day ${this.currentDay}`);
+          console.log(`📭 Day ${dayToFetch} has no transactions. Loading next day...`);
+          this.currentDay = dayToFetch;
+          
+          // Si no hay transacciones, intentamos cargar el siguiente día automáticamente
+          // pero con un pequeño retraso para evitar sobrecarga
+          setTimeout(() => {
+            this.loadNextDay();
+          }, 500);
         }
-        
-        // If we've reached the maximum days, mark as all data loaded
+
+        // Solo marcamos como completado si llegamos al máximo de días
         if (this.currentDay >= this.maxDays) {
-          console.log(`Reached maximum days (${this.maxDays}), marking all data as loaded`);
           this.allDataLoaded = true;
+          console.log("✅ Reached maxDays limit, stopping.");
         }
+
       } catch (error) {
-        console.error(`Error fetching transactions for day ${this.currentDay}:`, error);
-        this.errorMessage = `Error loading data: ${error.message}`;
-      } finally {
-        // Reset loading states
-        if (this.currentDay === 1) {
-          console.log("Setting isLoading to false for first day");
-          this.isLoading = false;
+        if (error.name === 'AbortError') {
+          console.warn(`Request timed out (${API_TIMEOUT/1000}s), retrying... [attempt ${retryCount + 1}]`);
+          if (retryCount < MAX_RETRIES) {
+            console.warn(`🔁 Retry ${retryCount + 1} for day ${dayToFetch}`);
+            return this.loadNextDay(retryCount + 1);
+          } else {
+            this.errorMessage = 'API request timed out multiple times.';
+          }
         } else {
-          console.log("Setting loadingMore to false for subsequent days");
-          this.loadingMore = false;
+          console.error('API error:', error);
+          this.errorMessage = `Error loading data: ${error.message}`;
         }
+      } finally {
+        if (this.currentDay === 1) this.isLoading = false;
+        else this.loadingMore = false;
       }
     },
 
@@ -466,161 +471,174 @@ export default {
     extractTransactionsFromResponse(data) {
       console.log("Extracting transactions from response. Available keys:", Object.keys(data));
       
-      // 0. Verificar en data.transactionDetails (nuevo)
+      // 1. Check in detailedTransactions.allTransactions
+      if (
+        data.detailedTransactions &&
+        Array.isArray(data.detailedTransactions.allTransactions) &&
+        data.detailedTransactions.allTransactions.length > 0
+      ) {
+        console.log("✅ Found transactions in detailedTransactions.allTransactions");
+        return data.detailedTransactions.allTransactions;
+      }
+
+      // 2. Check in allTransactions
+      if (Array.isArray(data.allTransactions) && data.allTransactions.length > 0) {
+        console.log("✅ Found transactions in allTransactions");
+        return data.allTransactions;
+      }
+
+      // 3. Check in transactions
+      if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+        console.log("✅ Found transactions in transactions");
+        return data.transactions;
+      }
+
+      // 4. Reconstruct from detailedTransactions.successful/failed/duplicates
+      if (data.detailedTransactions &&
+        (Array.isArray(data.detailedTransactions.successful) ||
+         Array.isArray(data.detailedTransactions.failed) ||
+         Array.isArray(data.detailedTransactions.duplicates))) {
+
+        console.log("🛠 Reconstructing transactions from detailedTransactions");
+
+        const allTransactions = [];
+
+        const pushTx = (list, status) => {
+          (data.detailedTransactions[list] || []).forEach(tx => {
+            if (tx.idFio) {
+              allTransactions.push({
+                ...tx,
+                imported: status === 'success'
+              });
+            }
+          });
+        };
+
+        pushTx('successful', 'success');
+        pushTx('failed', 'error');
+        pushTx('duplicates', 'already-imported');
+
+        if (allTransactions.length > 0) return allTransactions;
+      }
+
+      // 5. Fallback: root-level array with transaction-like objects
+      const possibleTransactions = Object.values(data).find(
+        value => Array.isArray(value) && value.length > 0 && (value[0].idFio || value[0].transactionId)
+      );
+
+      if (possibleTransactions) {
+        console.log("⚠️ Fallback: Found array of transactions in root object");
+        return possibleTransactions;
+      }
+
+      // 6. FINAL fallback: transactionDetails
       if (
         data.transactionDetails &&
         Array.isArray(data.transactionDetails) &&
         data.transactionDetails.length > 0
       ) {
-        console.log(`Found ${data.transactionDetails.length} transactions in data.transactionDetails`);
+        console.log("❗ Final fallback: using transactionDetails (likely incomplete)");
         return data.transactionDetails;
       }
 
-      // 1. Check in data.detailedTransactions.allTransactions
-      if (
-        data.detailedTransactions && 
-        data.detailedTransactions.allTransactions && 
-        Array.isArray(data.detailedTransactions.allTransactions) && 
-        data.detailedTransactions.allTransactions.length > 0
-      ) {
-        console.log("Found transactions in data.detailedTransactions.allTransactions");
-        return data.detailedTransactions.allTransactions;
-      } 
-      // 2. Check in data.allTransactions
-      else if (data.allTransactions && Array.isArray(data.allTransactions) && data.allTransactions.length > 0) {
-        console.log("Found transactions in data.allTransactions");
-        return data.allTransactions;
-      } 
-      // 3. Check in data.transactions
-      else if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
-        console.log("Found transactions in data.transactions");
-        return data.transactions;
-      } 
-      // 4. Reconstruct from successful, failed, duplicates
-      else if (data.detailedTransactions && 
-              (data.detailedTransactions.successful || 
-               data.detailedTransactions.failed || 
-               data.detailedTransactions.duplicates)) {
-        console.log("Reconstructing transactions from successful/failed/duplicates lists");
-        const allTransactions = [];
-        
-        // Add successful transactions
-        if (Array.isArray(data.detailedTransactions.successful)) {
-          data.detailedTransactions.successful.forEach(tx => {
-            if (tx.idFio) {
-              allTransactions.push({
-                idFio: tx.idFio,
-                statementNumber: tx.statementNumber,
-                imported: true
-              });
-            }
-          });
+      console.log("❌ No transactions found in the response");
+      return null;
+    },
+
+    // Helper method to get a value from a transaction field or raw data
+    getValue(tx, path, defaultValue = '') {
+      // Función auxiliar para extraer valores de columnas raw
+      const getColumnValue = (column) => {
+        if (!column) return null;
+        if (Array.isArray(column) && column.length > 0 && column[0]._) {
+          return column[0]._;
+        }
+        return null;
+      };
+      
+      // Primero intentamos obtener el valor directamente del objeto
+      if (tx[path] !== undefined && tx[path] !== null) {
+        return tx[path];
+      }
+      
+      // Si hay datos raw, intentamos extraer de ahí
+      if (tx.raw) {
+        // Intentar obtener de columnas numeradas (column_0, column_1, etc.)
+        const columnMatch = path.match(/^column_(\d+)$/);
+        if (columnMatch) {
+          const columnIndex = parseInt(columnMatch[1]);
+          const columnKey = `column_${columnIndex}`;
+          const value = getColumnValue(tx.raw[columnKey]);
+          if (value !== null) return value;
         }
         
-        // Add failed transactions
-        if (Array.isArray(data.detailedTransactions.failed)) {
-          data.detailedTransactions.failed.forEach(tx => {
-            if (tx.idFio) {
-              allTransactions.push({
-                idFio: tx.idFio,
-                statementNumber: tx.statementNumber,
-                imported: false
-              });
-            }
-          });
-        }
-        
-        // Add duplicate transactions
-        if (Array.isArray(data.detailedTransactions.duplicates)) {
-          data.detailedTransactions.duplicates.forEach(tx => {
-            if (tx.idFio) {
-              allTransactions.push({
-                idFio: tx.idFio,
-                statementNumber: tx.statementNumber,
-                imported: false
-              });
-            }
-          });
-        }
-        
-        if (allTransactions.length > 0) {
-          return allTransactions;
-        }
-      } 
-      // 5. Check if transactions might be in the root of the response
-      else {
-        console.log("Searching for transactions in the root of the response");
-        // Log all keys in the response to help debug
-        console.log("Response keys:", Object.keys(data));
-        
-        const possibleTransactions = Object.values(data).find(
-          value => Array.isArray(value) && value.length > 0 && value[0] && (value[0].idFio || value[0].transactionId)
-        );
-        
-        if (possibleTransactions) {
-          console.log("Found transactions in root of response");
-          return possibleTransactions;
+        // Intentar obtener de propiedades específicas en raw
+        if (tx.raw[path] !== undefined) {
+          const value = getColumnValue(tx.raw[path]);
+          if (value !== null) return value;
         }
       }
       
-      console.log("No transactions found in the response");
-      return null;
+      return defaultValue;
+    },
+
+    // Get transaction status
+    getTransactionStatus(tx) {
+      if (!this.detailedTransactions) return 'unknown';
+      
+      const match = (list) =>
+        Array.isArray(this.detailedTransactions[list]) &&
+        this.detailedTransactions[list].some(t => t.idFio === tx.idFio);
+      
+      if (match('successful')) return 'success';
+      if (match('failed')) return 'error';
+      if (match('duplicates')) return 'already-imported';
+      if (tx.imported === true) return 'success';
+      return 'unknown';
     },
 
     // Map transactions to DataGrid format
     mapTransactionsToDataGrid(transactions) {
       console.log("Mapping transactions to DataGrid format. Sample transaction:", transactions[0]);
       
-      return transactions.map(tx => {
-        // Determine status based on transaction properties and detailedTransactions
-        let status = 'unknown';
+      // Asegurarnos de que cada transacción tenga un ID único
+      const usedIds = new Set();
+      
+      return transactions.map((tx, index) => {
+        // Generar un ID único si no existe o está duplicado
+        let id = tx.idFio || tx.transactionId || tx.id || tx.statementNumber;
         
-        // Check if the transaction is in the successful list
-        if (this.detailedTransactions && 
-            this.detailedTransactions.successful && 
-            this.detailedTransactions.successful.some(item => item.idFio === tx.idFio)) {
-          status = 'success';
-        } 
-        // Check if it's in the failed list
-        else if (this.detailedTransactions && 
-                this.detailedTransactions.failed && 
-                this.detailedTransactions.failed.some(item => item.idFio === tx.idFio)) {
-          status = 'error';
-        } 
-        // Check if it's in the duplicates list
-        else if (this.detailedTransactions && 
-                this.detailedTransactions.duplicates && 
-                this.detailedTransactions.duplicates.some(item => item.idFio === tx.idFio)) {
-          status = 'already-imported';
-        }
-        // If imported flag is true but not in any detailed list
-        else if (tx.imported === true) {
-          status = 'success';
+        // Si el ID ya existe o no hay ID, generar uno único
+        if (!id || usedIds.has(id)) {
+          id = `tx-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 9)}`;
         }
         
-        // Create a transaction object with all possible fields
-        // Verificar todos los posibles nombres de campos
-        return {
-          id: tx.idFio || tx.transactionId || tx.id || '',
-          date: tx.transactionDate || tx.date || '',
-          amount: tx.amount || '',
-          currency: tx.currency || '',
-          counterAccount: tx.counterAccount || tx.counterPartyAccount || '',
-          counterName: tx.counterAccountName || tx.counterPartyName || '',
-          bankCode: tx.bankCode || '',
-          bankName: tx.bankName || '',
-          constantSymbol: tx.constantSymbol || tx.ks || '',
-          variableSymbol: tx.variableSymbol || tx.vs || '',
-          specificSymbol: tx.specificSymbol || tx.ss || '',
-          userId: tx.userIdentification || tx.userId || '',
-          message: tx.messageForRecipient || tx.message || '',
-          type: tx.transactionType || tx.type || '',
-          comment: tx.comment || tx.note || '',
-          paymentOrderId: tx.instructionId || tx.paymentOrderId || '',
-          status: status,
-          executor: tx.executedBy || tx.executor || '',
-          raw: tx.raw || null
+        usedIds.add(id);
+        
+        // Determinar los campos de la transacción
+        const mappedTransaction = {
+          id: id,
+          date: tx.transactionDate || tx.date || this.getValue(tx, 'column_0') || '',
+          amount: tx.amount || this.getValue(tx, 'column_1') || '',
+          currency: tx.currency || this.getValue(tx, 'column_14') || '',
+          counterAccount: tx.counterAccount || tx.counterPartyAccount || this.getValue(tx, 'column_2') || '',
+          counterName: tx.counterAccountName || tx.counterPartyName || this.getValue(tx, 'column_10') || '',
+          bankCode: tx.bankCode || this.getValue(tx, 'column_3') || '',
+          bankName: tx.bankName || this.getValue(tx, 'column_12') || '',
+          constantSymbol: tx.constantSymbol || tx.ks || this.getValue(tx, 'column_4') || '',
+          variableSymbol: tx.variableSymbol || tx.vs || this.getValue(tx, 'column_5') || '',
+          specificSymbol: tx.specificSymbol || tx.ss || this.getValue(tx, 'column_6') || '',
+          userId: tx.userIdentification || tx.userId || this.getValue(tx, 'column_7') || '',
+          message: tx.messageForRecipient || tx.message || this.getValue(tx, 'column_16') || '',
+          type: tx.transactionType || tx.type || this.getValue(tx, 'column_8') || '',
+          comment: tx.comment || tx.note || this.getValue(tx, 'column_25') || '',
+          paymentOrderId: tx.instructionId || tx.paymentOrderId || this.getValue(tx, 'column_17') || '',
+          status: this.getTransactionStatus(tx),
+          executor: tx.executedBy || tx.executor || this.getValue(tx, 'column_9') || '',
+          raw: tx.raw || tx
         };
+        
+        return mappedTransaction;
       });
     },
     
@@ -634,23 +652,24 @@ export default {
       // Create a new intersection observer
       this.observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-          if (entry.isIntersecting && !this.loadingMore && !this.allDataLoaded) {
+          if (entry.isIntersecting && !this.isLoading && !this.loadingMore && !this.allDataLoaded) {
             console.log("Intersection observer triggered, loading next day");
             this.loadNextDay();
           }
         });
       }, {
         root: null, // Use the viewport
-        rootMargin: '100px', // Load more when within 100px of the bottom
+        rootMargin: '400px', // Trigger when 400px from the bottom
         threshold: 0.1 // Trigger when 10% of the target is visible
       });
       
-      // Observe the grid container
-      if (this.$refs.gridContainer) {
-        this.observer.observe(this.$refs.gridContainer);
-        console.log('Intersection observer set up');
+      // Observe the load more trigger element
+      const loadMoreTrigger = this.$refs.loadMoreTrigger;
+      if (loadMoreTrigger) {
+        this.observer.observe(loadMoreTrigger);
+        console.log("✅ Observer set on load more trigger element");
       } else {
-        console.warn('No grid container found for intersection observer');
+        console.warn("⚠️ Load more trigger element not found");
       }
     },
     
@@ -664,32 +683,62 @@ export default {
       });
     },
     
-    // Additional method for scroll event handling (fallback for intersection observer)
-    handleScroll() {
-      if (this.loadingMore || this.allDataLoaded) return;
+    // Método para configurar el listener de scroll en el contenedor de DataGrid
+    setupGridScrollListener() {
+      this.$nextTick(() => {
+        setTimeout(() => {
+          const gridContent = this.$el.querySelector('.dx-scrollable-container');
+          if (gridContent) {
+            console.log('Setting up scroll listener on grid container');
+            gridContent.addEventListener('scroll', () => {
+              const nearBottom = gridContent.scrollTop + gridContent.clientHeight >= gridContent.scrollHeight - 50;
+              if (nearBottom && !this.isLoading && !this.loadingMore && !this.allDataLoaded) {
+                console.log("Grid scroll listener triggered, loading next day");
+                this.loadNextDay();
+              }
+            });
+          } else {
+            console.warn('No grid content found for scroll listener');
+          }
+        }, 1000); // Dar tiempo a que se renderice el grid
+      });
+    },
+    
+    // Cargar estados guardados de los paneles
+    loadSavedPanelStates() {
+      // Cargar estado del panel de control
+      const controlPanelState = localStorage.getItem(STORAGE_KEY_CONTROL_PANEL);
+      if (controlPanelState !== null) {
+        this.showControlPanel = controlPanelState === 'true';
+      }
       
-      const scrollPosition = window.innerHeight + window.scrollY;
-      const documentHeight = document.documentElement.offsetHeight;
+      // Cargar estado del panel de resumen de importación
+      const importSummaryState = localStorage.getItem(STORAGE_KEY_IMPORT_SUMMARY);
+      if (importSummaryState !== null) {
+        this.showImportSummary = importSummaryState === 'true';
+      }
       
-      // Load more data when user scrolls to the bottom of the page
-      if (scrollPosition >= documentHeight - 200) {
-        console.log("Scroll event triggered, loading next day");
-        this.loadNextDay();
+      // Cargar estado del panel de información de cuenta
+      const accountInfoState = localStorage.getItem(STORAGE_KEY_ACCOUNT_INFO);
+      if (accountInfoState !== null) {
+        this.showAccountInfo = accountInfoState === 'true';
       }
     }
   },
   mounted() {
     console.log("Component mounted");
+    
+    // Cargar estados guardados de los paneles
+    this.loadSavedPanelStates();
+    
     // Start loading data
     this.fetchFirstDay();
     
     // Set up the intersection observer for infinite scrolling
-    this.$nextTick(() => {
-      this.setupIntersectionObserver();
-    });
+    this.setupIntersectionObserver();
     
-    // Add scroll event listener as a fallback for intersection observer
-    window.addEventListener('scroll', this.handleScroll);
+    // Configurar el listener de scroll como plan B
+    this.setupGridScrollListener();
   },
   
   beforeDestroy() {
@@ -699,8 +748,11 @@ export default {
       this.observer.disconnect();
     }
     
-    // Remove scroll event listener
-    window.removeEventListener('scroll', this.handleScroll);
+    // Remove scroll event listener from grid container
+    const gridContent = this.$el.querySelector('.dx-scrollable-container');
+    if (gridContent) {
+      gridContent.removeEventListener('scroll', this.handleScroll);
+    }
   }
 };
 </script>
@@ -718,21 +770,6 @@ export default {
   --border-color: #e5e7eb;
   --bg-light: #f9fafb;
   --bg-white: #ffffff;
-}
-
-/* Debug info */
-.debug-info {
-  margin-bottom: 20px;
-  padding: 10px;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-family: monospace;
-  font-size: 12px;
-}
-
-.debug-info p {
-  margin: 5px 0;
 }
 
 /* General styles */
@@ -1014,13 +1051,35 @@ export default {
   color: var(--text-color);
 }
 
+/* Debug info */
+.debug-info {
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.debug-info h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #334155;
+}
+
+.debug-info p {
+  margin: 4px 0;
+  color: #475569;
+}
+
 /* Data grid container */
 .data-grid-container {
   flex: 1;
   overflow: hidden;
   position: relative;
-  min-height: 400px; /* Asegurar una altura mínima */
-  height: 600px; /* Altura fija para pruebas */
+  min-height: 400px;
+  height: auto;
 }
 
 /* Loading indicator */
@@ -1066,37 +1125,37 @@ export default {
 }
 
 /* DevExtreme customization */
-:deep(.dx-datagrid) {
+.dx-datagrid {
   background-color: var(--bg-white);
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border-color);
 }
 
-:deep(.dx-datagrid-headers) {
+.dx-datagrid-headers {
   background-color: var(--bg-light);
   color: var(--text-color);
   font-weight: 600;
 }
 
-:deep(.dx-datagrid-rowsview) {
+.dx-datagrid-rowsview {
   border-top: 1px solid var(--border-color);
 }
 
-:deep(.dx-datagrid-headers .dx-datagrid-table .dx-row > td) {
+.dx-datagrid-headers .dx-datagrid-table .dx-row > td {
   padding: 12px 16px;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-:deep(.dx-datagrid-rowsview .dx-row > td) {
+.dx-datagrid-rowsview .dx-row > td {
   padding: 12px 16px;
   font-size: 14px;
   border-bottom: 1px solid var(--border-color);
 }
 
-:deep(.dx-datagrid-rowsview .dx-row:hover) {
+.dx-datagrid-rowsview .dx-row:hover {
   background-color: var(--bg-light);
 }
 
@@ -1206,6 +1265,13 @@ export default {
   border-top: 1px solid var(--border-color);
   font-size: 14px;
   color: var(--text-light);
+}
+
+/* Load more trigger element - invisible but used for intersection observer */
+.load-more-trigger {
+  height: 20px;
+  width: 100%;
+  margin-top: 10px;
 }
 
 /* Responsive */

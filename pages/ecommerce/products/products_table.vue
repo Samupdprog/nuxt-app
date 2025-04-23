@@ -4,13 +4,21 @@
       <div class="page-header">
         <div class="header-row">
           <h1 class="page-title">Products</h1>
-          <button @click="toggleControlPanel" class="btn-toggle-controls">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 15l-6-6-6 6" v-if="showControlPanel"/>
-              <path d="M6 9l6 6 6-6" v-else/>
-            </svg>
-            {{ showControlPanel ? 'Hide Controls' : 'Show Controls' }}
-          </button>
+          <div class="header-actions">
+            <button @click="toggleControlPanel" class="btn-toggle-controls">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 15l-6-6-6 6" v-if="showControlPanel"/>
+                <path d="M6 9l6 6 6-6" v-else/>
+              </svg>
+              {{ showControlPanel ? 'Hide Controls' : 'Show Controls' }}
+            </button>
+            <button v-if="isCachedData" @click="clearCacheAndFetch" class="btn-refresh" title="Clear cache and refresh data">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+              </svg>
+              Clear Cache
+            </button>
+          </div>
         </div>
         <div v-if="showControlPanel" class="controls-panel">
           <div class="controls-left">
@@ -39,6 +47,7 @@
           
           <div class="last-update">
             Last update: {{ lastUpdated }}
+            <span v-if="isCachedData" class="cached-indicator">(Cached)</span>
           </div>
         </div>
       </div>
@@ -59,7 +68,10 @@
           :allow-column-resizing="true"
           :row-alternation-enabled="true"
           :no-data-text="'No products found'"
+          :scrolling="{ mode: 'standard' }"
           @row-click="viewProductDetails"
+          @content-ready="onContentReady"
+          ref="dataGrid"
         >
           <!-- Image Column -->
           <DxColumn data-field="imageUrl" caption="Image" width="80" alignment="center" cell-template="imageTemplate" />
@@ -130,10 +142,9 @@
           <DxFilterRow :visible="true" />
           <DxHeaderFilter :visible="true" />
           <DxSearchPanel :visible="true" :highlight-case-sensitive="false" />
-          <DxColumnChooser :enabled="true" />
+          <DxColumnChooser :enabled="true" mode="select" />
           <DxSelection mode="multiple" />
-          <DxPaging :page-size="20" />
-          <DxPager :show-page-size-selector="true" :allowed-page-sizes="[10, 20, 50]" />
+          <DxPaging :enabled="false" />
         </DxDataGrid>
       </div>
 
@@ -289,7 +300,9 @@ export default {
       showControlPanel: true,
       filterActive: 'all',
       originalProducts: [],
-      apiUrl: "http://35.180.124.4:1880/get-all-products" // Changed from 35.180.124.4 to localhost
+      apiUrl: "http://35.180.124.4:1880/get-all-products",
+      gridInstance: null,
+      isCachedData: false
     };
   },
   methods: {
@@ -311,38 +324,80 @@ export default {
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     },
     
-    // Fetch products from API
+    onContentReady(e) {
+      this.gridInstance = e.component;
+      this.$nextTick(() => {
+        // Asegurar que las columnas de la izquierda sean visibles inicialmente
+        const visibleColumns = this.gridInstance.getVisibleColumns();
+        if (visibleColumns.length > 0) {
+          this.gridInstance.scrollTo(0);
+        }
+      });
+    },
+
+    // Save current state to sessionStorage
+    saveTableState() {
+      const tableState = {
+        products: this.products,
+        originalProducts: this.originalProducts,
+        lastUpdated: this.lastUpdated,
+        filterActive: this.filterActive
+      };
+      
+      sessionStorage.setItem('productsTableState', JSON.stringify(tableState));
+    },
+
+    // Load table state from sessionStorage
+    loadTableState() {
+      try {
+        const savedState = sessionStorage.getItem('productsTableState');
+        if (savedState) {
+          const parsedState = JSON.parse(savedState);
+          
+          this.products = parsedState.products || [];
+          this.originalProducts = parsedState.originalProducts || [];
+          this.lastUpdated = parsedState.lastUpdated || this.getCurrentTime();
+          this.filterActive = parsedState.filterActive || 'all';
+          
+          this.isLoading = false;
+          this.isCachedData = true;
+          
+          console.log("Table data loaded from cache:", this.products.length, "products");
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error("Error loading table state from sessionStorage:", error);
+        return false;
+      }
+    },
+
+    // Clear cache and fetch new data
+    clearCacheAndFetch() {
+      console.log("Clearing cache and fetching new data...");
+      sessionStorage.removeItem('productsTableState');
+      this.isCachedData = false;
+      this.fetchProducts();
+    },
+
     async fetchProducts() {
       this.isLoading = true;
+      this.products = [];
+      
       try {
         const response = await fetch(this.apiUrl);
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status} ${response.statusText}`);
-        }
-        
         const data = await response.json();
         
         if (data && data.products && Array.isArray(data.products)) {
           this.originalProducts = this.processProducts(data.products);
           this.products = [...this.originalProducts];
           this.applyFilters();
-          this.$toast({
-            message: `Successfully loaded ${this.products.length} products`,
-            type: 'success',
-            duration: 3000
-          });
-        } else {
-          console.error("Invalid data structure:", data);
-          this.$toast({
-            message: "Invalid data structure received from server",
-            type: 'error',
-            duration: 3000
-          });
-          this.products = [];
+          this.updateLastUpdatedTime();
+          
+          // Save to cache after successful fetch
+          this.saveTableState();
+          this.isCachedData = true;
         }
-        
-        this.updateLastUpdatedTime();
       } catch (error) {
         console.error("Error loading products:", error);
         this.$toast({
@@ -350,7 +405,6 @@ export default {
           type: 'error',
           duration: 3000
         });
-        this.products = [];
       } finally {
         this.isLoading = false;
       }
@@ -474,10 +528,19 @@ export default {
           document.body.removeChild(toast);
         }, 300);
       }, options.duration || 3000);
+    },
+
+    getCurrentTime() {
+      const now = new Date();
+      return now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
     }
   },
   mounted() {
-    this.fetchProducts();
+    // Try to load from cache first
+    if (!this.loadTableState()) {
+      // If no cache, fetch from API
+      this.fetchProducts();
+    }
   }
 };
 </script>
@@ -645,15 +708,23 @@ export default {
 
 /* Data grid container */
 .data-grid-container {
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  overflow: hidden;
-  position: relative;
+  min-height: 0;
+  height: calc(100vh - 200px);
+  margin-top: 20px;
 }
 
 /* Products table */
 .products-table {
   height: 100%;
   width: 100%;
+  min-height: 500px;
+}
+
+.products-dashboard:not(.show-controls) .data-grid-container {
+  height: calc(100vh - 100px);
 }
 
 /* Loading indicator */
@@ -1109,5 +1180,53 @@ export default {
     width: 95%;
     max-height: 95vh;
   }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .data-grid-container {
+    height: calc(100vh - 250px);
+  }
+  
+  .products-dashboard:not(.show-controls) .data-grid-container {
+    height: calc(100vh - 120px);
+  }
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-white);
+  color: var(--text-color);
+}
+
+.btn-refresh:hover {
+  background-color: var(--bg-light);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.btn-refresh .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.cached-indicator {
+  font-size: 12px;
+  color: var(--warning-color);
+  margin-left: 6px;
+  font-style: italic;
 }
 </style>

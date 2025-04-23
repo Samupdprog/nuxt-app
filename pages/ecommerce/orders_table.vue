@@ -147,7 +147,7 @@
           <DxFilterRow :visible="true" />
           <DxHeaderFilter :visible="true" />
           <DxSearchPanel :visible="true" :highlight-case-sensitive="false" />
-          <DxColumnChooser :enabled="true" />
+          <DxColumnChooser :enabled="true" mode="select" />
           <DxSelection mode="multiple" />
           <DxPaging :enabled="false" />
         </DxDataGrid>
@@ -156,6 +156,26 @@
         <div v-if="isLoadingMore" class="loading-more-container">
           <div class="loading-spinner-small"></div>
           <p class="loading-more-text">Loading more orders...</p>
+        </div>
+        
+        <!-- Floating loading indicator -->
+        <div v-if="isLoadingMore" class="floating-loading-indicator">
+          <div class="loading-spinner-small"></div>
+        </div>
+        
+        <!-- Load More Button -->
+        <div v-if="!isLoadingMore && hasMoreData && orders.length > 0" class="load-more-container">
+          <button @click="loadMoreOrders" class="btn-load-more">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Load More Orders
+          </button>
+        </div>
+        
+        <!-- All Data Loaded Indicator -->
+        <div v-if="!hasMoreData && orders.length > 0" class="all-data-loaded">
+          All orders loaded
         </div>
       </div>
     </div>
@@ -256,22 +276,23 @@ export default {
       scrollPosition: 0,
       // Pagination properties
       pageSize: 10,
-      fromIndex: 0,
-      toIndex: 9,
+      currentPage: 0,
+      maxPages: 10, // Máximo de páginas a cargar (0-9, 10-19, ..., 90-99)
       // Auto refresh tracking
       autoRefreshActive: false,
       lastOrderCount: 0,
       // Flag to use mock data (for testing)
-      useMockData: false
+      useMockData: false,
+      errorMessage: null
     };
   },
   methods: {
-    // Add timeout to fetch requests to prevent hanging
-    fetchWithTimeout(url, options = {}, timeout = 8000) {
+    // Modificar el método fetchWithTimeout
+    fetchWithTimeout(url, options = {}, timeout = 7000) {
       return Promise.race([
         fetch(url, options),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("TimeoutExceeded")), timeout)
+          setTimeout(() => reject(new Error("The api is taking too long to respond")), timeout)
         )
       ]);
     },
@@ -318,6 +339,12 @@ export default {
             }, 100);
           }
         }
+
+        // Asegurar que las columnas de la izquierda sean visibles inicialmente
+        const visibleColumns = this.gridInstance.getVisibleColumns();
+        if (visibleColumns.length > 0) {
+          this.gridInstance.scrollTo(0);
+        }
       });
     },
     
@@ -329,8 +356,7 @@ export default {
       
       // Reset state
       this.isCachedData = false;
-      this.fromIndex = 0;
-      this.toIndex = this.pageSize - 1;
+      this.currentPage = 0;
       this.hasMoreData = true;
       this.orders = [];
       this.scrollPosition = 0;
@@ -343,8 +369,8 @@ export default {
     saveTableState() {
       const tableState = {
         orders: this.orders,
-        fromIndex: this.fromIndex,
-        toIndex: this.toIndex,
+        currentPage: this.currentPage,
+        maxPages: this.maxPages,
         hasMoreData: this.hasMoreData,
         scrollPosition: this.scrollPosition,
         lastUpdated: this.lastUpdated,
@@ -364,8 +390,8 @@ export default {
           const parsedState = JSON.parse(savedState);
           
           this.orders = parsedState.orders || [];
-          this.fromIndex = parsedState.fromIndex || 0;
-          this.toIndex = parsedState.toIndex || 9;
+          this.currentPage = parsedState.currentPage || 0;
+          this.maxPages = parsedState.maxPages || 10;
           this.hasMoreData = parsedState.hasMoreData !== undefined ? parsedState.hasMoreData : true;
           this.scrollPosition = parsedState.scrollPosition || 0;
           this.lastUpdated = parsedState.lastUpdated || this.getCurrentTime();
@@ -398,8 +424,14 @@ export default {
     // Refresh data from server
     refreshData() {
       this.isCachedData = false;
-      this.fromIndex = 0;
-      this.toIndex = this.pageSize - 1;
+      this.currentPage = 0;
+      this.hasMoreData = true;
+      this.orders = [];
+      this.scrollPosition = 0;
+      
+      this.isLoading = true;
+      console.log("Fetching initial orders...");
+      
       this.fetchOrders();
     },
     
@@ -408,175 +440,57 @@ export default {
       if (!this.hasMoreData || this.isLoadingMore) return;
       
       this.isLoadingMore = true;
-      console.log(`Pagination: fromIndex=${this.fromIndex}, toIndex=${this.toIndex}`);
-      console.log("Loading more orders...");
+      this.errorMessage = null;
+      this.currentPage++;
+      
+      if (this.currentPage >= this.maxPages) {
+        this.hasMoreData = false;
+        this.isLoadingMore = false;
+        return;
+      }
+      
+      const fromIndex = this.currentPage * this.pageSize;
+      const toIndex = fromIndex + this.pageSize - 1;
       
       try {
-        // Update indices for next page
-        this.fromIndex = this.toIndex + 1;
-        this.toIndex = this.fromIndex + this.pageSize - 1;
-        
-        console.log(`New pagination: fromIndex=${this.fromIndex}, toIndex=${this.toIndex}`);
-        
-        // If using mock data (for testing)
-        if (this.useMockData) {
-          await this.simulateApiDelay();
-          
-          // Get a slice of mock data
-          const startIndex = this.fromIndex;
-          const endIndex = Math.min(this.toIndex, MOCK_ORDERS.length - 1);
-          
-          if (startIndex >= MOCK_ORDERS.length) {
-            this.hasMoreData = false;
-            this.saveTableState();
-            return;
-          }
-          
-          const mockSlice = MOCK_ORDERS.slice(startIndex, endIndex + 1);
-          this.orders = [...this.orders, ...mockSlice];
-          
-          if (mockSlice.length < this.pageSize) {
-            this.hasMoreData = false;
-          }
+        const endpoint = `http://35.180.124.4:1880/import-orders/${fromIndex}/${toIndex}`;
+        const response = await this.fetchWithTimeout(endpoint, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store'
+        });
 
-          this.saveTableState();
-          return;
+        // Ignorar error 401 y continuar con el procesamiento
+        const data = await response.json();
+        
+        if (!data || !data.processedOrders || !Array.isArray(data.processedOrders)) {
+          throw new Error("Formato de datos inválido de la API");
         }
-        
-        const endpoint = `http://35.180.124.4:1880/import-orders/${this.fromIndex}/${this.toIndex}`;
-        
-        console.log(`Fetching orders from ${this.fromIndex} to ${this.toIndex} from ${endpoint}`);
-        
-        let response;
-        try {
-          response = await this.fetchWithTimeout(endpoint, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-            cache: 'no-store' // Prevent caching
-          });
-        } catch (error) {
-          if (error.message === "TimeoutExceeded") {
-            console.warn("La API tardó demasiado. Parando la carga infinita.");
-            this.hasMoreData = false;
-            this.saveTableState();
-            return;
-          }
 
-          console.error("Error de red o fetch:", error);
+        const newOrders = this.processOrdersData(data);
+        
+        if (newOrders.length === 0) {
           this.hasMoreData = false;
-          this.saveTableState();
-          return;
-        }
-        
-        // Try to parse response even if status is not 200
-        if (!response.ok) {
-          console.warn(`API returned ${response.status}. Trying to parse response anyway...`);
-          
-          const rawText = await response.text();
-          try {
-            const data = JSON.parse(rawText);
-            const newOrders = this.processOrdersData(data);
-            
-            // Check for duplicates before adding
-            const existingOrderNumbers = new Set(this.orders.map(o => o.order_number));
-            const uniqueNewOrders = newOrders.filter(o => !existingOrderNumbers.has(o.order_number));
-            
-            this.orders = [...this.orders, ...uniqueNewOrders];
-            
-            // If we got fewer orders than expected, assume we've reached the end
-            if (uniqueNewOrders.length < this.pageSize) {
-              this.hasMoreData = false;
-            }
-            
-            this.saveTableState();
-            return;
-          } catch (err) {
-            console.error("Error parsing fallback response", err);
-            
-            // Fallback to mock data as last resort
-            const startIndex = this.fromIndex;
-            const endIndex = Math.min(this.toIndex, MOCK_ORDERS.length - 1);
-            
-            if (startIndex >= MOCK_ORDERS.length) {
-              this.hasMoreData = false;
-              this.saveTableState();
-              return;
-            }
-            
-            const mockSlice = MOCK_ORDERS.slice(startIndex, endIndex + 1);
-            this.orders = [...this.orders, ...mockSlice];
-            
-            this.saveTableState();
-            return;
-          }
-        }
-        
-        // Get the raw text first
-        const rawText = await response.text();
-        console.log("Raw response:", rawText.substring(0, 100) + "...");
-        
-        // Try to sanitize the JSON by replacing invalid control characters
-        const sanitizedText = rawText
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-          .replace(/\\"/g, '\\"') // Fix escaped quotes
-          .replace(/\n/g, "\\n") // Properly escape newlines
-          .replace(/\r/g, "\\r") // Properly escape carriage returns
-          .replace(/\t/g, "\\t"); // Properly escape tabs
-        
-        // Parse the sanitized JSON
-        let data;
-        try {
-          data = JSON.parse(sanitizedText);
-        } catch (parseError) {
-          console.error("JSON Parse Error:", parseError);
-          console.log("Problematic JSON:", sanitizedText.substring(0, 200));
-          throw new Error("Invalid JSON response from server");
-        }
-        
-        if (data && data.processedOrders && Array.isArray(data.processedOrders)) {
-          // Process and add new orders
-          const newOrders = this.processOrdersData(data);
-          
-          // Check for duplicates before adding
-          const existingOrderNumbers = new Set(this.orders.map(o => o.order_number));
-          const uniqueNewOrders = newOrders.filter(o => !existingOrderNumbers.has(o.order_number));
-          
-          // Append unique new orders to existing orders
-          this.orders = [...this.orders, ...uniqueNewOrders];
-          
-          // If we got fewer orders than expected, assume we've reached the end
-          if (uniqueNewOrders.length < this.pageSize) {
-            this.hasMoreData = false;
-          }
-          
-          console.log(`Added ${uniqueNewOrders.length} more orders. Total: ${this.orders.length}`);
-          
-          // Save updated state
-          this.saveTableState();
         } else {
-          console.error("Invalid data structure:", data);
-          this.$toast({
-            message: "Invalid data structure received from server",
-            type: 'error',
-            duration: 3000
-          });
-          this.hasMoreData = false;
-          this.saveTableState();
+          this.orders = [...this.orders, ...newOrders];
         }
+        
       } catch (error) {
         console.error("Error loading more orders:", error);
-        this.$toast({
-          message: "Error loading more orders: " + (error.message || "Unknown error"),
-          type: 'error',
-          duration: 3000
-        });
-        this.hasMoreData = false;
-        this.saveTableState();
+        // Solo mostrar error si no es 401
+        if (!error.message.includes('401')) {
+          this.errorMessage = error.message || "Error al cargar más pedidos";
+          this.$toast({
+            message: this.errorMessage,
+            type: 'error',
+            duration: 5000
+          });
+          this.hasMoreData = false;
+        }
       } finally {
-        console.log("Continuando scroll infinito…");
         this.isLoadingMore = false;
       }
     },
@@ -659,139 +573,46 @@ export default {
     },
     
     async fetchOrders() {
-      // Reset pagination state
-      this.fromIndex = 0;
-      this.toIndex = this.pageSize - 1;
-      this.hasMoreData = true;
-      this.orders = [];
-      this.scrollPosition = 0;
-      
       this.isLoading = true;
+      this.errorMessage = null;
       console.log("Fetching initial orders...");
       
       try {
-        // If using mock data (for testing)
-        if (this.useMockData) {
-          await this.simulateApiDelay();
-          
-          // Get first page of mock data
-          const mockSlice = MOCK_ORDERS.slice(0, this.pageSize);
-          this.orders = mockSlice;
-          
-          console.log(`Loaded ${mockSlice.length} mock orders`);
-          this.updateLastUpdatedTime();
-          this.isCachedData = false;
-          this.saveTableState();
-          return;
-        }
-        
-        const endpoint = `http://35.180.124.4:1880/import-orders/${this.fromIndex}/${this.toIndex}`;
+        const endpoint = `http://35.180.124.4:1880/import-orders/0/9`;
         console.log("Fetching from endpoint:", endpoint);
         
-        let response;
-        try {
-          response = await this.fetchWithTimeout(endpoint, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-            cache: 'no-store' // Prevent caching
-          });
-        } catch (error) {
-          if (error.message === "TimeoutExceeded") {
-            console.warn("La API tardó demasiado. Usando datos de prueba.");
-            this.orders = MOCK_ORDERS.slice(0, this.pageSize);
-            this.updateLastUpdatedTime();
-            this.isCachedData = false;
-            this.saveTableState();
-            return;
-          }
-          
-          console.error("Error de red o fetch:", error);
-          this.orders = MOCK_ORDERS.slice(0, this.pageSize);
-          this.updateLastUpdatedTime();
-          this.isCachedData = false;
-          this.saveTableState();
-          return;
-        }
-        
-        // Try to parse response even if status is not 200
-        if (!response.ok) {
-          console.warn(`API returned ${response.status}. Trying to parse response anyway...`);
-          
-          const rawText = await response.text();
-          try {
-            const data = JSON.parse(rawText);
-            this.orders = this.processOrdersData(data);
-            this.updateLastUpdatedTime();
-            this.isCachedData = false;
-            this.saveTableState();
-            return;
-          } catch (err) {
-            console.error("Error parsing fallback response", err);
-            this.orders = MOCK_ORDERS.slice(0, this.pageSize); // fallback final
-            this.updateLastUpdatedTime();
-            this.isCachedData = false;
-            this.saveTableState();
-            return;
-          }
-        }
-        
-        // Get the raw text first
-        const rawText = await response.text();
-        console.log("Raw response:", rawText.substring(0, 100) + "...");
-        
-        // Try to sanitize the JSON by replacing invalid control characters
-        const sanitizedText = rawText
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-          .replace(/\\"/g, '\\"') // Fix escaped quotes
-          .replace(/\n/g, "\\n") // Properly escape newlines
-          .replace(/\r/g, "\\r") // Properly escape carriage returns
-          .replace(/\t/g, "\\t"); // Properly escape tabs
-        
-        // Parse the sanitized JSON
-        let data;
-        try {
-          data = JSON.parse(sanitizedText);
-        } catch (parseError) {
-          console.error("JSON Parse Error:", parseError);
-          console.log("Problematic JSON:", sanitizedText.substring(0, 200));
-          throw new Error("Invalid JSON response from server");
-        }
-        
-        console.log("API Response:", data); // Log the response to see the structure
-        
-        if (data && data.processedOrders && Array.isArray(data.processedOrders)) {
-          this.orders = this.processOrdersData(data);
-
-          console.log("Processed Orders:", this.orders.length); // Log the processed orders count
-          
-          // Store the current order count for comparison during auto-refresh
-          this.lastOrderCount = this.orders.length;
-          
-          this.updateLastUpdatedTime();
-          this.isCachedData = false;
-          
-          // Save updated state
-          this.saveTableState();
-        } else {
-          console.error("Invalid data structure:", data);
-          this.$toast({
-            message: "Invalid data structure received from server",
-            type: 'error',
-            duration: 3000
-          });
-          this.orders = [];
-        }
-      } catch (error) {
-        console.error("Error loading orders:", error);
-        this.$toast({
-          message: "Error loading orders: " + (error.message || "Unknown error"),
-          type: 'error',
-          duration: 3000
+        const response = await this.fetchWithTimeout(endpoint, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store'
         });
-        this.orders = [];
+
+        // Ignorar error 401 y continuar con el procesamiento
+        const data = await response.json();
+        
+        if (!data || !data.processedOrders || !Array.isArray(data.processedOrders)) {
+          throw new Error("Formato de datos inválido de la API");
+        }
+
+        this.orders = this.processOrdersData(data);
+        this.currentPage = 0;
+        this.hasMoreData = true;
+        this.updateLastUpdatedTime();
+        
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        // Solo mostrar error si no es 401
+        if (!error.message.includes('401')) {
+          this.errorMessage = error.message || "Error al cargar los pedidos";
+          this.$toast({
+            message: this.errorMessage,
+            type: 'error',
+            duration: 5000
+          });
+        }
       } finally {
         this.isLoading = false;
       }
@@ -1128,7 +949,7 @@ export default {
 .orders-dashboard {
   padding-left: 20px;
   padding-right: 20px;
-  padding-bottom: 30px;
+  padding-bottom: 0px;
   padding-top:10px;
 }
 
@@ -1214,7 +1035,7 @@ export default {
 
 /* Make sure the grid takes full height for proper scrolling */
 .orders-table {
-  height: 600px;
+  height: 100%;
   width: 100%;
 }
 
@@ -1223,7 +1044,25 @@ export default {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0; /* Important for flex child to respect parent height */
+  min-height: 0;
+  height: calc(100vh - 200px); /* Ajustado para ocupar más espacio */
+  margin-top: 20px;
+}
+
+/* Ajuste cuando el panel de control está oculto */
+.orders-dashboard:not(.show-controls) .data-grid-container {
+  height: calc(100vh - 100px);
+}
+
+/* Ajuste responsivo para pantallas más pequeñas */
+@media (max-width: 768px) {
+  .data-grid-container {
+    height: calc(100vh - 250px);
+  }
+  
+  .orders-dashboard:not(.show-controls) .data-grid-container {
+    height: calc(100vh - 120px);
+  }
 }
 
 /* Toast notifications */
@@ -1296,5 +1135,78 @@ export default {
   font-size: 16px;
   color: var(--text-color);
   margin: 0;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background-color: var(--bg-light);
+  border-top: 1px solid var(--border-color);
+}
+
+.btn-load-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-load-more:hover {
+  background-color: var(--primary-color-dark);
+  transform: translateY(-1px);
+}
+
+.btn-load-more .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.all-data-loaded {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-light);
+  font-style: italic;
+  background-color: var(--bg-light);
+  border-top: 1px solid var(--border-color);
+}
+
+.floating-loading-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  padding: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ajuste para asegurar que la tabla muestre las columnas de la izquierda inicialmente */
+.orders-table {
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+}
+
+.orders-table .dx-datagrid-headers {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.orders-table .dx-datagrid-rowsview {
+  overflow-x: auto;
 }
 </style>

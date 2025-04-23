@@ -1,5 +1,5 @@
 <template>
-    <div class="container mx-auto p-4 max-w-3xl">
+    <div class="container mx-auto p-4 max-w-3xxl">
       <div class="flex items-center mb-6">
         <button 
           @click="$router.back()" 
@@ -12,6 +12,18 @@
           Back
         </button>
         <h1 class="text-2xl font-bold">Invoice Details</h1>
+        <button 
+          v-if="invoiceData"
+          @click="exportToPDF" 
+          class="ml-auto px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export to PDF
+        </button>
       </div>
   
       <div v-if="!invoiceData" class="text-center py-8">
@@ -22,7 +34,7 @@
         <div class="bg-white border border-gray-200 rounded-md shadow-sm mb-6">
           <div class="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
             <h2 class="text-xl font-semibold">Invoice Status</h2>
-            <div :class="`rounded-full p-2 ${invoiceData.status === 'ok' ? 'bg-green-100' : 'bg-red-100'}`">
+            <div :class="`rounded-full p-2 ${invoiceData.status === 'ok' ? 'bg-green-300' : 'bg-red-100'}`">
               <svg v-if="invoiceData.status === 'ok'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
@@ -55,29 +67,6 @@
           </div>
         </div>
   
-        <div v-if="invoiceData.parsedInfo && invoiceData.parsedInfo.items" class="bg-white border border-gray-200 rounded-md shadow-sm mb-6">
-          <div class="border-b border-gray-200 px-6 py-4">
-            <h2 class="text-xl font-semibold">Invoice Items</h2>
-          </div>
-          <div class="p-6">
-            <div v-for="(item, index) in invoiceData.parsedInfo.items" :key="index" class="mb-4">
-              <div class="flex justify-between items-start">
-                <div class="flex-1">
-                  <h3 class="font-medium">{{ item.name }}</h3>
-                  <p v-if="item.note && item.note !== item.name" class="text-sm text-gray-500">{{ item.note }}</p>
-                </div>
-                <div class="text-right">
-                  <div class="font-medium">{{ formatCurrency(item.priceSum) }}</div>
-                  <div class="text-sm text-gray-500">
-                    {{ item.quantity }} × {{ formatCurrency(item.unitPrice) }}
-                  </div>
-                </div>
-              </div>
-              <hr v-if="index < invoiceData.parsedInfo.items.length - 1" class="my-4 border-gray-200" />
-            </div>
-          </div>
-        </div>
-  
         <div v-if="invoiceData.customer" class="bg-white border border-gray-200 rounded-md shadow-sm mb-6">
           <div class="border-b border-gray-200 px-6 py-4">
             <h2 class="text-xl font-semibold">Customer Information</h2>
@@ -102,6 +91,30 @@
             </div>
           </div>
         </div>
+
+        <div v-if="invoiceData.parsedInfo && invoiceData.parsedInfo.items" class="bg-white border border-gray-200 rounded-md shadow-sm mb-6">
+          <div class="border-b border-gray-200 px-6 py-4">
+            <h2 class="text-xl font-semibold">Invoice Items</h2>
+          </div>
+          <div class="p-6">
+            <div v-for="(item, index) in invoiceData.parsedInfo.items" :key="index" class="mb-4">
+              <div class="flex justify-between items-start">
+                <div class="flex-1">
+                  <h3 class="font-medium">{{ item.name }}</h3>
+                  <p v-if="item.note && item.note !== item.name" class="text-sm text-gray-500">{{ item.note }}</p>
+                </div>
+                <div class="text-right">
+                  <div class="font-medium">{{ formatCurrency(item.priceSum) }}</div>
+                  <div class="text-sm text-gray-500">
+                    {{ item.quantity }} × {{ formatCurrency(item.unitPrice) }}
+                  </div>
+                </div>
+              </div>
+              <hr v-if="index < invoiceData.parsedInfo.items.length - 1" class="my-4 border-gray-200" />
+            </div>
+          </div>
+        </div>
+  
   
         <div v-if="invoiceData.warnings && invoiceData.warnings.length > 0" class="bg-white border border-gray-200 rounded-md shadow-sm">
           <div class="border-b border-gray-200 px-6 py-4">
@@ -129,6 +142,7 @@
     data() {
       return {
         invoiceData: null,
+        loadingPDF: false
       }
     },
     methods: {
@@ -136,6 +150,30 @@
         const num = Number.parseFloat(amount)
         return new Intl.NumberFormat("cs-CZ", { style: "currency", currency: "CZK" }).format(num)
       },
+      async exportToPDF() {
+        if (!this.invoiceData || !this.invoiceData.variableSymbol) return;
+        
+        this.loadingPDF = true;
+        try {
+          const response = await fetch(`http://35.180.124.4:1880/invoicepdf/${this.invoiceData.variableSymbol}`);
+          if (!response.ok) throw new Error('Failed to generate PDF');
+          
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `invoice_${this.invoiceData.variableSymbol}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } catch (error) {
+          console.error('Error exporting PDF:', error);
+          alert('Failed to export PDF. Please try again.');
+        } finally {
+          this.loadingPDF = false;
+        }
+      }
     },
     mounted() {
       const dataParam = this.$route.query.data

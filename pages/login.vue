@@ -12,6 +12,7 @@
                 prepend-icon="mdi-account" 
                 :rules="usernameRules"
                 required
+                @keyup.enter="handleEnter"
               ></v-text-field>
               <v-text-field 
                 v-model="password" 
@@ -20,6 +21,7 @@
                 type="password" 
                 :rules="passwordRules"
                 required
+                @keyup.enter="handleEnter"
               ></v-text-field>
               <v-btn 
                 color="primary" 
@@ -28,6 +30,7 @@
                 :disabled="!valid" 
                 @click="login"
                 :loading="loading"
+                :class="{ 'btn-pressed': isPressed }"
               >
                 Login
               </v-btn>
@@ -51,6 +54,7 @@ const valid = ref(false);
 const loading = ref(false);
 const error = ref('');
 const loginForm = ref(null);
+const isPressed = ref(false);
 
 const usernameRules = [
   v => !!v || 'Username is required',
@@ -61,6 +65,16 @@ const passwordRules = [
   v => !!v || 'Password is required',
   v => v.length >= 6 || 'Password must be at least 6 characters'
 ];
+
+const handleEnter = () => {
+  if (valid.value) {
+    isPressed.value = true;
+    setTimeout(() => {
+      isPressed.value = false;
+    }, 200);
+    login();
+  }
+};
 
 onMounted(() => {
   // Check if already logged in
@@ -107,4 +121,11 @@ async function login() {
   }
 }
 </script>
+
+<style scoped>
+.btn-pressed {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+</style>
 

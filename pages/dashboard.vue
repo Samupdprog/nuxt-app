@@ -41,15 +41,6 @@
         </v-card>
       </v-col>
       <v-col cols="12" md="4">
-        <v-card class="pa-3" hover @click="$router.push('/preforma/products')">
-          <v-card-title>Preforma Invoice</v-card-title>
-          <v-card-text>Manage invoices and settings</v-card-text>
-          <v-card-actions>
-            <v-btn variant="text" color="primary">Open</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-col>
-      <v-col cols="12" md="4">
         <v-card class="pa-3" hover @click="$router.push('/fio/fio_table')">
           <v-card-title>Fio Transactions</v-card-title>
           <v-card-text>Check financial transactions</v-card-text>

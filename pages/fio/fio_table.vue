@@ -16,13 +16,21 @@
       <div class="page-header">
         <div class="header-row">
           <h1 class="page-title">Fio Transactions</h1>
-          <button @click="toggleControlPanel" class="btn-toggle-controls">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 15l-6-6-6 6" v-if="showControlPanel"/>
-              <path d="M6 9l6 6 6-6" v-else/>
-            </svg>
-            {{ showControlPanel ? 'Hide Controls' : 'Show Controls' }}
-          </button>
+          <div class="header-actions">
+            <button @click="toggleControlPanel" class="btn-toggle-controls">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 15l-6-6-6 6" v-if="showControlPanel"/>
+                <path d="M6 9l6 6 6-6" v-else/>
+              </svg>
+              {{ showControlPanel ? 'Hide Controls' : 'Show Controls' }}
+            </button>
+            <button v-if="isCachedData" @click="clearCacheAndFetch" class="btn-refresh" title="Clear cache and refresh data">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+              </svg>
+              Clear Cache
+            </button>
+          </div>
         </div>
         
         <!-- Controls Panel -->
@@ -57,12 +65,13 @@
           
           <div class="last-update">
             Last update: {{ lastUpdated }}
+            <span v-if="isCachedData" class="cached-indicator">(Cached)</span>
           </div>
         </div>
       </div>
       
       <!-- Import Summary Section -->
-      <div v-if="importSummary" class="import-summary-container">
+      <div v-if="importSummary && showControlPanel" class="import-summary-container">
         <div class="import-summary-header" @click="toggleImportSummary">
           <h2>Import Summary</h2>
           <button class="btn-toggle-info">
@@ -107,7 +116,7 @@
       </div>
 
       <!-- Account Info Section -->
-      <div v-if="accountInfo" class="account-info-container">
+      <div v-if="accountInfo && showControlPanel" class="account-info-container">
         <div class="account-info-header" @click="toggleAccountInfo">
           <h2>Account Information</h2>
           <button class="btn-toggle-info">
@@ -146,7 +155,7 @@
       </div>
 
       <!-- DataGrid -->
-      <div class="data-grid-container" ref="gridContainer">
+      <div class="data-grid-container" :class="{ 'expanded': !showControlPanel }" ref="gridContainer">
         <DxDataGrid
           ref="dataGrid"
           :data-source="transactions"
@@ -158,6 +167,8 @@
           :row-alternation-enabled="true"
           @row-click="onRowClick"
           :no-data-text="'No transactions found'"
+          :height="'calc(100vh - 200px)'"
+          :scrolling="{ mode: 'virtual' }"
         >
           <DxPaging :enabled="false" />
           <!-- Import Status column (always visible) -->
@@ -230,6 +241,16 @@
       <div v-if="allDataLoaded && transactions.length > 0" class="all-data-loaded">
         <span>All transactions loaded</span>
       </div>
+
+      <!-- Load More Button -->
+      <div v-if="!allDataLoaded && !loadingMore" class="load-more-button-container">
+        <button @click="loadNextDay" class="btn btn-primary load-more-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14M5 12h14"></path>
+          </svg>
+          Load More Transactions
+        </button>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -281,6 +302,7 @@ export default {
       allDataLoaded: false, // Flag to indicate if all data has been loaded
       observer: null, // Intersection observer for infinite scrolling
       debug: true, // Habilitar debug info para diagnóstico
+      isCachedData: false // Flag to indicate if data is loaded from cache
     };
   },
   methods: {
@@ -288,6 +310,14 @@ export default {
     toggleControlPanel() {
       this.showControlPanel = !this.showControlPanel;
       localStorage.setItem(STORAGE_KEY_CONTROL_PANEL, this.showControlPanel);
+      
+      // Si ocultamos los controles, también ocultamos los paneles desplegables
+      if (!this.showControlPanel) {
+        this.showImportSummary = false;
+        this.showAccountInfo = false;
+        localStorage.setItem(STORAGE_KEY_IMPORT_SUMMARY, false);
+        localStorage.setItem(STORAGE_KEY_ACCOUNT_INFO, false);
+      }
     },
     
     // Toggle import summary visibility y guardar estado
@@ -343,21 +373,36 @@ export default {
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
-      return date.toLocaleDateString();
+      return date.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
     },
     
     // Format date and time
     formatDateTime(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
-      return date.toLocaleString();
+      return date.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
     },
     
     // Format date for display
     formatDateDisplay(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString.split('+')[0]);
-      return date.toLocaleDateString();
+      return date.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
     },
     
     // Reset and start fetching data from day 1
@@ -386,7 +431,7 @@ export default {
 
       if (this.maxDays && dayToFetch > this.maxDays) {
         this.allDataLoaded = true;
-        console.log("✅ Reached maxDays limit, stopping.");
+        console.log("Reached maxDays limit, stopping.");
         return;
       }
 
@@ -681,6 +726,9 @@ export default {
         minute: "2-digit",
         second: "2-digit"
       });
+      
+      // Save to cache after updating time
+      this.saveTableState();
     },
     
     // Método para configurar el listener de scroll en el contenedor de DataGrid
@@ -723,7 +771,63 @@ export default {
       if (accountInfoState !== null) {
         this.showAccountInfo = accountInfoState === 'true';
       }
-    }
+    },
+
+    // Save current state to sessionStorage
+    saveTableState() {
+      const tableState = {
+        transactions: this.transactions,
+        importSummary: this.importSummary,
+        accountInfo: this.accountInfo,
+        lastUpdated: this.lastUpdated,
+        currentDay: this.currentDay,
+        maxDays: this.maxDays,
+        allDataLoaded: this.allDataLoaded
+      };
+      
+      sessionStorage.setItem('fioTableState', JSON.stringify(tableState));
+    },
+
+    // Load table state from sessionStorage
+    loadTableState() {
+      try {
+        const savedState = sessionStorage.getItem('fioTableState');
+        if (savedState) {
+          const parsedState = JSON.parse(savedState);
+          
+          this.transactions = parsedState.transactions || [];
+          this.importSummary = parsedState.importSummary || null;
+          this.accountInfo = parsedState.accountInfo || null;
+          this.lastUpdated = parsedState.lastUpdated || this.getCurrentTime();
+          this.currentDay = parsedState.currentDay || 0;
+          this.maxDays = parsedState.maxDays || 90;
+          this.allDataLoaded = parsedState.allDataLoaded || false;
+          
+          this.isLoading = false;
+          this.isCachedData = true;
+          
+          console.log("Table data loaded from cache:", this.transactions.length, "transactions");
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error("Error loading table state from sessionStorage:", error);
+        return false;
+      }
+    },
+
+    // Clear cache and fetch new data
+    clearCacheAndFetch() {
+      console.log("Clearing cache and fetching new data...");
+      sessionStorage.removeItem('fioTableState');
+      this.isCachedData = false;
+      this.fetchFirstDay();
+    },
+
+    getCurrentTime() {
+      const now = new Date();
+      return now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    },
   },
   mounted() {
     console.log("Component mounted");
@@ -731,8 +835,11 @@ export default {
     // Cargar estados guardados de los paneles
     this.loadSavedPanelStates();
     
-    // Start loading data
-    this.fetchFirstDay();
+    // Try to load from cache first
+    if (!this.loadTableState()) {
+      // If no cache, fetch from API
+      this.fetchFirstDay();
+    }
     
     // Set up the intersection observer for infinite scrolling
     this.setupIntersectionObserver();
@@ -1079,7 +1186,8 @@ export default {
   overflow: hidden;
   position: relative;
   min-height: 400px;
-  height: auto;
+  height: calc(100vh - 400px);
+  margin-bottom: 20px;
 }
 
 /* Loading indicator */
@@ -1130,6 +1238,7 @@ export default {
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border-color);
+  height: 100%;
 }
 
 .dx-datagrid-headers {
@@ -1140,6 +1249,7 @@ export default {
 
 .dx-datagrid-rowsview {
   border-top: 1px solid var(--border-color);
+  height: 100%;
 }
 
 .dx-datagrid-headers .dx-datagrid-table .dx-row > td {
@@ -1274,7 +1384,47 @@ export default {
   margin-top: 10px;
 }
 
-/* Responsive */
+/* Expanded grid container */
+.data-grid-container.expanded {
+  height: calc(100vh - 100px);
+  margin-top: 20px;
+}
+
+/* Load More Button */
+.load-more-button-container {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+  padding: 0 20px;
+}
+
+.load-more-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-more-btn:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.load-more-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
   .controls-panel {
     flex-direction: column;
@@ -1292,5 +1442,46 @@ export default {
   .summary-grid {
     grid-template-columns: 1fr;
   }
+  
+  .data-grid-container.expanded {
+    height: calc(100vh - 120px);
+  }
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-white);
+  color: var(--text-color);
+}
+
+.btn-refresh:hover {
+  background-color: var(--bg-light);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.btn-refresh .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.cached-indicator {
+  font-size: 12px;
+  color: var(--warning-color);
+  margin-left: 6px;
+  font-style: italic;
 }
 </style>

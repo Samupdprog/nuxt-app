@@ -422,7 +422,7 @@ export default {
     },
 
     async loadNextDay(retryCount = 0) {
-      const API_TIMEOUT = 5000; // Aumentado a 5 segundos
+      const API_TIMEOUT = 8000; // Aumentado a 5 segundos
       const MAX_RETRIES = 3;
       
       if (this.isLoading || this.loadingMore || this.allDataLoaded) return;
@@ -470,14 +470,14 @@ export default {
           this.transactions = [...this.transactions, ...newTransactions];
           this.updateLastUpdatedTime();
           this.currentDay = dayToFetch;
-          console.log(`📦 Day ${this.currentDay}: ${newTransactions.length} transactions loaded.`);
+          console.log(`Day ${this.currentDay}: ${newTransactions.length} transactions loaded.`);
           
           // Configurar el observer para el nuevo elemento de carga
           this.$nextTick(() => {
             this.setupIntersectionObserver();
           });
         } else {
-          console.log(`📭 Day ${dayToFetch} has no transactions. Loading next day...`);
+          console.log(`Day ${dayToFetch} has no transactions. Loading next day...`);
           this.currentDay = dayToFetch;
           
           // Si no hay transacciones, intentamos cargar el siguiente día automáticamente
@@ -490,14 +490,14 @@ export default {
         // Solo marcamos como completado si llegamos al máximo de días
         if (this.currentDay >= this.maxDays) {
           this.allDataLoaded = true;
-          console.log("✅ Reached maxDays limit, stopping.");
+          console.log("Reached maxDays limit, stopping.");
         }
 
       } catch (error) {
         if (error.name === 'AbortError') {
           console.warn(`Request timed out (${API_TIMEOUT/1000}s), retrying... [attempt ${retryCount + 1}]`);
           if (retryCount < MAX_RETRIES) {
-            console.warn(`🔁 Retry ${retryCount + 1} for day ${dayToFetch}`);
+            console.warn(`Retry ${retryCount + 1} for day ${dayToFetch}`);
             return this.loadNextDay(retryCount + 1);
           } else {
             this.errorMessage = 'API request timed out multiple times.';
@@ -522,19 +522,19 @@ export default {
         Array.isArray(data.detailedTransactions.allTransactions) &&
         data.detailedTransactions.allTransactions.length > 0
       ) {
-        console.log("✅ Found transactions in detailedTransactions.allTransactions");
+        console.log("Found transactions in detailedTransactions.allTransactions");
         return data.detailedTransactions.allTransactions;
       }
 
       // 2. Check in allTransactions
       if (Array.isArray(data.allTransactions) && data.allTransactions.length > 0) {
-        console.log("✅ Found transactions in allTransactions");
+        console.log("Found transactions in allTransactions");
         return data.allTransactions;
       }
 
       // 3. Check in transactions
       if (Array.isArray(data.transactions) && data.transactions.length > 0) {
-        console.log("✅ Found transactions in transactions");
+        console.log("Found transactions in transactions");
         return data.transactions;
       }
 
@@ -572,7 +572,7 @@ export default {
       );
 
       if (possibleTransactions) {
-        console.log("⚠️ Fallback: Found array of transactions in root object");
+        console.log("Fallback: Found array of transactions in root object");
         return possibleTransactions;
       }
 
@@ -582,11 +582,11 @@ export default {
         Array.isArray(data.transactionDetails) &&
         data.transactionDetails.length > 0
       ) {
-        console.log("❗ Final fallback: using transactionDetails (likely incomplete)");
+        console.log("Final fallback: using transactionDetails (likely incomplete)");
         return data.transactionDetails;
       }
 
-      console.log("❌ No transactions found in the response");
+      console.log("No transactions found in the response");
       return null;
     },
 
@@ -712,9 +712,9 @@ export default {
       const loadMoreTrigger = this.$refs.loadMoreTrigger;
       if (loadMoreTrigger) {
         this.observer.observe(loadMoreTrigger);
-        console.log("✅ Observer set on load more trigger element");
+        console.log("Observer set on load more trigger element");
       } else {
-        console.warn("⚠️ Load more trigger element not found");
+        console.warn("Load more trigger element not found");
       }
     },
     

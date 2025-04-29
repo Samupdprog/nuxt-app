@@ -8,6 +8,23 @@
         <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
         <span class="ml-3 text-sm font-medium text-gray-700">Create and Download PDF</span>
       </label>
+
+      <!-- Modified PDF input and button -->
+      <div class="flex items-center gap-2 ml-4">
+        <input
+          type="text"
+          v-model="modifiedSymbol"
+          placeholder="Variable symbol for modified PDF"
+          class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button 
+          @click="generateModifiedPDF"
+          class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          :disabled="!modifiedSymbol"
+        >
+          Modified PDF
+        </button>
+      </div>
     </div>
 
     <form @submit.prevent="handleSearch" class="mb-6">
@@ -129,7 +146,49 @@
 
     <!-- Tabla de facturas procesadas -->
     <div class="mt-8">
-      <h2 class="text-xl font-semibold mb-4">Processed Invoices</h2>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Processed Invoices</h2>
+        <button 
+          @click="refreshLogs"
+          class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 inline-flex items-center space-x-2"
+          :disabled="loadingInvoices"
+        >
+          <span v-if="loadingInvoices" class="inline-block animate-spin h-5 w-5">
+            <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </span>
+          <span v-else class="inline-block h-5 w-5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </span>
+          <span>{{ loadingInvoices ? 'Refreshing...' : 'Refresh Logs' }}</span>
+        </button>
+      </div>
+
+      <!-- Filtro de Variable Symbol -->
+      <div class="mb-4">
+        <div class="flex items-center space-x-2">
+          <input
+            type="text"
+            v-model="filterSymbol"
+            placeholder="Filter by Variable Symbol"
+            class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-grow"
+          />
+          <button
+            @click="clearFilter"
+            v-if="filterSymbol"
+            class="px-3 py-2 text-gray-600 hover:text-gray-800 focus:outline-none"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
@@ -144,25 +203,29 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="invoice in processedInvoices" :key="invoice.id" class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+            <tr v-for="invoice in filteredInvoices" :key="invoice.id" class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {{ invoice.variableSymbol }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ invoice.invoiceNumber }}
+                {{ getInvoiceNumber(invoice) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ invoice.customer.name }}
+                {{ invoice.parsedInfo?.customer?.name || 'N/A' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ formatCurrency(invoice.parsedInfo.total) }}
+                {{ formatCurrency(invoice.parsedInfo?.total || 0) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {{ formatDate(invoice.timestamp) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="`px-5 inline-flex text-xs leading-7 font-semibold rounded-full ${invoice.status === 'ok' ? 'bg-green-200 text-green-900' : 'bg-red-100 text-red-800'}`">
-                  {{ invoice.status === 'ok' ? 'OK' : 'Error' }}
+                <span :class="`px-5 inline-flex text-xs leading-7 font-semibold rounded-full ${
+                  invoice.status === 'ok' ? 'bg-green-200 text-green-900' : 
+                  invoice.status === 'modified' ? 'bg-blue-200 text-blue-900' :
+                  'bg-red-100 text-red-800'
+                }`">
+                  {{ invoice.status === 'modified' ? 'MODIFIED' : invoice.status === 'ok' ? 'OK' : 'Error' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -197,7 +260,9 @@ export default {
       createAndDownloadPDF: false,
       successSound: null,
       errorSound: null,
-      lastProcessedSymbol: null
+      lastProcessedSymbol: null,
+      modifiedSymbol: "",
+      filterSymbol: ""
     }
   },
   watch: {
@@ -208,6 +273,17 @@ export default {
           console.error('Error playing sound:', error);
         });
       }
+    }
+  },
+  computed: {
+    filteredInvoices() {
+      if (!this.filterSymbol) {
+        return this.processedInvoices;
+      }
+      const searchTerm = this.filterSymbol.toLowerCase().trim();
+      return this.processedInvoices.filter(invoice => 
+        invoice.variableSymbol?.toLowerCase().includes(searchTerm)
+      );
     }
   },
   methods: {
@@ -236,13 +312,16 @@ export default {
     },
     
     async handleSearch() {
-      if (!this.variableSymbol.trim()) return
+      if (!this.variableSymbol.trim()) return;
       
-      this.loading = true
-      this.error = ""
-      this.duplicateWarning = false
+      this.loading = true;
+      this.error = "";
+      this.duplicateWarning = false;
       
       try {
+        // Actualizar la lista antes de la búsqueda
+        await this.fetchProcessedInvoices();
+        
         // Check if variable symbol already exists
         const exists = this.processedInvoices.some(
           invoice => invoice.variableSymbol === this.variableSymbol.trim()
@@ -317,7 +396,7 @@ export default {
         // Focus the input field for the next scan
         this.focusInput()
 
-        // Refresh the processed invoices list
+        // Actualizar la lista después de la búsqueda
         await this.fetchProcessedInvoices()
       } catch (err) {
         this.error = "Failed to fetch invoice data"
@@ -360,15 +439,44 @@ export default {
       }
     },
     async fetchProcessedInvoices() {
-      this.loadingInvoices = true;
       try {
         const response = await fetch('http://35.180.124.4:1880/logbilling/');
+        if (!response.ok) {
+          throw new Error('Failed to fetch invoices');
+        }
         const data = await response.json();
-        this.processedInvoices = data;
+        
+        // Validar y limpiar los datos antes de procesarlos
+        const validData = data.filter(invoice => {
+          return invoice && invoice.parsedInfo && invoice.variableSymbol;
+        });
+        
+        // Procesar los datos antes de asignarlos
+        const processedData = [...validData].sort((a, b) => 
+          new Date(b.timestamp) - new Date(a.timestamp)
+        );
+        
+        // Marcar los duplicados
+        const seen = new Set();
+        processedData.forEach(invoice => {
+          if (seen.has(invoice.variableSymbol)) {
+            if (invoice.status === 'ok') {
+              // Mantener el estado original
+            }
+          } else {
+            seen.add(invoice.variableSymbol);
+            if (invoice.status === 'generated') {
+              invoice.status = 'modified';
+            }
+          }
+        });
+        
+        // Asignar los datos procesados
+        this.processedInvoices = processedData;
+        console.log('Logs updated, found:', processedData.length, 'invoices');
       } catch (err) {
         console.error('Error fetching processed invoices:', err);
-      } finally {
-        this.loadingInvoices = false;
+        this.error = "Failed to fetch invoice logs";
       }
     },
     formatDate(timestamp) {
@@ -396,6 +504,8 @@ export default {
         if (response.ok) {
           this.processedInvoices = [];
           this.error = "All logs have been deleted successfully";
+          // Actualizar la lista después de borrar todo
+          await this.fetchProcessedInvoices();
         } else {
           throw new Error(data.message || 'Failed to delete logs');
         }
@@ -410,7 +520,8 @@ export default {
       if (!this.deleteVariableSymbol.trim()) return;
       
       this.loading = true;
-      this.error = ""; // Limpiar cualquier error anterior
+      this.error = "";
+      
       try {
         const response = await fetch(`http://35.180.124.4:1880/logbilling/${this.deleteVariableSymbol.trim()}`, {
           method: 'DELETE'
@@ -419,11 +530,10 @@ export default {
         const data = await response.json();
         
         if (response.ok) {
-          this.processedInvoices = this.processedInvoices.filter(
-            invoice => invoice.variableSymbol !== this.deleteVariableSymbol.trim()
-          );
           this.deleteVariableSymbol = '';
           this.error = "Log deleted successfully";
+          // Actualizar la lista después de borrar
+          await this.fetchProcessedInvoices();
         } else {
           throw new Error(data.message || 'Failed to delete log');
         }
@@ -439,17 +549,120 @@ export default {
         path: "/billing/details",
         query: { data: JSON.stringify(invoice) }
       });
+    },
+    async generateModifiedPDF() {
+      if (!this.modifiedSymbol.trim()) return;
+      
+      this.loading = true;
+      this.error = "";
+      this.duplicateWarning = false;
+      
+      try {
+        await this.fetchProcessedInvoices();
+        
+        const matches = this.processedInvoices
+          .filter(invoice => invoice.variableSymbol === this.modifiedSymbol.trim())
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        if (matches.length === 0) {
+          throw new Error('Variable symbol not found in database');
+        }
+
+        const mostRecentInvoice = matches[0];
+        console.log('Using most recent invoice:', mostRecentInvoice);
+
+        // En lugar de abrir directamente, primero intentamos obtener el PDF
+        const pdfUrl = `http://35.180.124.4:1880/billing/final/${this.modifiedSymbol.trim()}/pdfm`;
+        
+        // Mostrar mensaje de que se está procesando
+        this.error = "Processing PDF, please wait...";
+        
+        // Crear un enlace temporal
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Esperar un momento y actualizar los logs
+        setTimeout(async () => {
+          await this.fetchProcessedInvoices();
+          this.loading = false;
+          this.modifiedSymbol = "";
+          this.error = "Modified PDF processed successfully";
+          
+          if (this.successSound) {
+            this.successSound.play().catch(error => {
+              console.error('Error playing success sound:', error);
+            });
+          }
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Error generating modified PDF:', error);
+        this.error = `Failed to generate modified PDF: ${error.message}`;
+        
+        if (this.errorSound) {
+          this.errorSound.play().catch(error => {
+            console.error('Error playing error sound:', error);
+          });
+        }
+        this.loading = false;
+      }
+    },
+    async refreshLogs() {
+      if (this.loadingInvoices) return;
+      
+      this.loadingInvoices = true;
+      try {
+        // Limpiar los datos actuales antes de la actualización
+        this.processedInvoices = [];
+        
+        // Pequeña pausa para asegurar que la UI se actualice
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        await this.fetchProcessedInvoices();
+        
+        // Mostrar mensaje de éxito temporal
+        this.error = "Logs refreshed successfully";
+        setTimeout(() => {
+          if (this.error === "Logs refreshed successfully") {
+            this.error = "";
+          }
+        }, 2000);
+      } catch (err) {
+        console.error('Error refreshing logs:', err);
+        this.error = "Failed to refresh logs";
+      } finally {
+        this.loadingInvoices = false;
+      }
+    },
+    getInvoiceNumber(invoice) {
+      if (typeof invoice.invoiceNumber === 'string') {
+        return invoice.invoiceNumber;
+      }
+      if (typeof invoice.invoiceNumber === 'object' && invoice.invoiceNumber['typ:numberRequested']) {
+        return invoice.invoiceNumber['typ:numberRequested'];
+      }
+      if (invoice.parsedInfo?.numberRequested) {
+        return invoice.parsedInfo.numberRequested;
+      }
+      return 'N/A';
+    },
+    clearFilter() {
+      this.filterSymbol = "";
     }
   },
   mounted() {
     // Focus the input field when the component is mounted
-    this.focusInput()
+    this.focusInput();
     
     // Add global event listener for keyboard input
-    document.addEventListener('keydown', this.handleKeyDown)
+    document.addEventListener('keydown', this.handleKeyDown);
 
     // Fetch processed invoices
-    this.fetchProcessedInvoices()
+    this.fetchProcessedInvoices();
 
     // Initialize sounds
     try {
@@ -461,28 +674,25 @@ export default {
       // Precargar los sonidos
       this.successSound.load();
       this.errorSound.load();
-      
-      // Añadir event listeners para depuración
-      this.successSound.addEventListener('canplaythrough', () => {
-        console.log('Success sound loaded');
-      });
-      this.errorSound.addEventListener('canplaythrough', () => {
-        console.log('Error sound loaded');
-      });
-      
-      this.successSound.addEventListener('error', (e) => {
-        console.error('Error loading success sound:', e);
-      });
-      this.errorSound.addEventListener('error', (e) => {
-        console.error('Error loading error sound:', e);
-      });
     } catch (error) {
       console.error('Error initializing sounds:', error);
     }
+
+    // Configurar un intervalo para actualizar los logs periódicamente
+    this.logsInterval = setInterval(() => {
+      if (!this.loading) {
+        this.fetchProcessedInvoices();
+      }
+    }, 5000); // Actualizar cada 5 segundos si no hay operaciones en curso
   },
   beforeDestroy() {
     // Remove event listener when component is destroyed
-    document.removeEventListener('keydown', this.handleKeyDown)
+    document.removeEventListener('keydown', this.handleKeyDown);
+    
+    // Clear the logs update interval
+    if (this.logsInterval) {
+      clearInterval(this.logsInterval);
+    }
   }
 }
 </script>
